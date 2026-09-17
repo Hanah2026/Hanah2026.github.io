@@ -99,14 +99,41 @@
 </section>
 
 <section id="student-login" class="section login-section">
-  <div class="container login-box">
-    <div><p class="eyebrow">ONLINE STUDENT SYSTEM</p><h2>Student <span>Portal</span></h2><p>Students can use the academy portal for their account, records, attendance, promotion information and announcements.</p></div>
-    <form id="loginForm">
-      <label>Email address<input type="email" id="email" placeholder="student@email.com" required></label>
-      <label>Password<input type="password" id="password" placeholder="Password" required></label>
-      <button class="btn primary" type="submit">SIGN IN</button>
-      <p id="loginMessage" class="form-message"></p>
-    </form>
+  <div class="container">
+    <div class="portal-heading">
+      <div><p class="eyebrow">ONLINE STUDENT SYSTEM</p><h2>Student <span>Portal</span></h2></div>
+      <span class="portal-status">● SYSTEM READY</span>
+    </div>
+    <div class="portal-grid">
+      <div class="portal-info">
+        <p>One secure place for Hanah Neht students and academy administration.</p>
+        <div class="portal-features">
+          <span>✓ Student Profile</span><span>✓ Belt / Rank</span><span>✓ Attendance</span>
+          <span>✓ Promotion History</span><span>✓ Payment Records</span><span>✓ Announcements</span>
+        </div>
+        <div class="portal-note"><strong>Coming next:</strong> We will connect this portal to a free authentication and database service so student accounts and records can be managed online.</div>
+      </div>
+      <form id="loginForm" class="portal-form">
+        <h3>STUDENT SIGN IN</h3>
+        <label>Email address<input type="email" id="email" placeholder="student@email.com" required></label>
+        <label>Password<input type="password" id="password" placeholder="Password" required></label>
+        <button class="btn primary" type="submit">SIGN IN</button>
+        <button class="btn outline" type="button" id="registerBtn">CREATE STUDENT ACCOUNT</button>
+        <p id="loginMessage" class="form-message"></p>
+      </form>
+    </div>
+  </div>
+</section>
+
+<section class="section highlights">
+  <div class="container">
+    <p class="eyebrow">WHY TRAIN WITH US</p>
+    <h2>More than <span>Taekwondo.</span></h2>
+    <div class="highlight-grid">
+      <article><b>01</b><h3>CHARACTER</h3><p>Build courtesy, perseverance, self-control and an indomitable spirit.</p></article>
+      <article><b>02</b><h3>TECHNIQUE</h3><p>Develop fundamentals, poomsae, Kyorugi and progressive belt skills.</p></article>
+      <article><b>03</b><h3>COMMUNITY</h3><p>Train in a structured environment that values teamwork and respect.</p></article>
+    </div>
   </div>
 </section>
 

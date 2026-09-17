@@ -7,3 +7,10 @@ document.querySelector('#loginForm').addEventListener('submit',function(e){
   document.querySelector('#loginMessage').textContent =
     'Student portal connection is not configured yet. This demo is ready to connect to a free database such as Supabase.';
 });
+
+const registerBtn=document.querySelector('#registerBtn');
+if(registerBtn){
+  registerBtn.addEventListener('click',()=>{
+    document.querySelector('#loginMessage').textContent='Online registration will be enabled when the free student database is connected.';
+  });
+}
