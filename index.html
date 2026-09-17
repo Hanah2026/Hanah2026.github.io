@@ -151,7 +151,19 @@
 </section>
 </main>
 
-<footer><div class="container footer-wrap"><div><strong>HANAH NEHT TAEKWONDO ACADEMY</strong><small>KUKKIWON DOJANG</small></div><span>© 2026 Hanah Neht Taekwondo Academy</span></div></footer>
+<div id="registerModal" class="modal" aria-hidden="true">
+<div class="modal-card">
+<button class="modal-close" id="closeRegister" type="button">×</button>
+<p class="eyebrow">STUDENT REGISTRATION</p>
+<h2>Create <span>Account</span></h2>
+<form id="registerForm">
+<label>First name<input id="regFirstName" required></label>
+<label>Last name<input id="regLastName" required></label>
+<label>Email address<input type="email" id="regEmail" required></label>
+<label>Password<input type="password" id="regPassword" minlength="6" required></label>
+<button class="btn primary" type="submit">CREATE ACCOUNT</button>
+<p id="registerMessage" class="form-message"></p>
+</form></div></div><footer><div class="container footer-wrap"><div><strong>HANAH NEHT TAEKWONDO ACADEMY</strong><small>KUKKIWON DOJANG</small></div><span>© 2026 Hanah Neht Taekwondo Academy</span></div></footer>
 <script src="script.js"></script>
 </body>
 </html>
