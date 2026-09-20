@@ -374,6 +374,165 @@ async function approveStudent(studentId, button) {
   }
 }
 
+
+// Attendance Management
+function ensureAttendancePanel() {
+  let panel = $("attendancePanel");
+  if (panel) return panel;
+  const section = $("student-login");
+  const container = section?.querySelector(".container");
+  if (!container) return null;
+
+  panel = document.createElement("div");
+  panel.id = "attendancePanel";
+  panel.className = "admin-dashboard attendance-panel";
+  panel.style.display = "block";
+  panel.innerHTML = `
+    <div class="admin-head">
+      <div>
+        <p class="eyebrow">ATTENDANCE MANAGEMENT</p>
+        <h2>Academy <span>Attendance</span></h2>
+        <p class="admin-subtitle">Record and review student attendance.</p>
+      </div>
+      <button id="attendanceRefresh" class="btn outline" type="button">REFRESH</button>
+    </div>
+    <div class="attendance-form">
+      <select id="attendanceStudent" aria-label="Student"></select>
+      <input id="attendanceDate" type="date" aria-label="Attendance date">
+      <select id="attendanceStatus" aria-label="Attendance status">
+        <option value="Present">Present</option>
+        <option value="Absent">Absent</option>
+        <option value="Late">Late</option>
+        <option value="Excused">Excused</option>
+      </select>
+      <input id="attendanceRemarks" type="text" placeholder="Remarks (optional)">
+      <button id="saveAttendance" class="btn" type="button">SAVE ATTENDANCE</button>
+    </div>
+    <div class="admin-table-wrap">
+      <table class="admin-table">
+        <thead><tr><th>Student</th><th>Date</th><th>Status</th><th>Remarks</th></tr></thead>
+        <tbody id="attendanceRows"><tr><td colspan="4">Loading attendance…</td></tr></tbody>
+      </table>
+    </div>
+    <p id="attendanceMessage" class="form-message"></p>
+  `;
+  container.appendChild(panel);
+
+  const date = $("attendanceDate");
+  if (date) date.value = new Date().toISOString().slice(0,10);
+  $("attendanceRefresh")?.addEventListener("click", loadAdminAttendance);
+  $("saveAttendance")?.addEventListener("click", saveAttendanceRecord);
+  $("attendanceStudent")?.addEventListener("change", loadAdminAttendance);
+  return panel;
+}
+
+async function loadAttendanceStudents() {
+  const select = $("attendanceStudent");
+  if (!select) return;
+  const { data, error } = await db
+    .from("students")
+    .select("id, first_name, middle_name, last_name, student_id")
+    .order("last_name", { ascending: true });
+  if (error) {
+    setMessage($("attendanceMessage"), error.message, "error");
+    return;
+  }
+  select.innerHTML = (data || []).map(s => {
+    const name = [s.first_name, s.middle_name, s.last_name].filter(Boolean).join(" ") || "Unnamed Student";
+    return `<option value="${escapeHtml(s.id)}">${escapeHtml(name)}${s.student_id ? ` — ${escapeHtml(s.student_id)}` : ""}</option>`;
+  }).join("") || `<option value="">No students found</option>`;
+}
+
+async function loadAdminAttendance() {
+  const rows = $("attendanceRows");
+  const studentId = $("attendanceStudent")?.value;
+  if (!rows) return;
+  rows.innerHTML = `<tr><td colspan="4">Loading attendance…</td></tr>`;
+  let query = db.from("attendance")
+    .select("id, student_id, attendance_date, status, remarks, created_at")
+    .order("attendance_date", { ascending: false })
+    .limit(100);
+  if (studentId) query = query.eq("student_id", studentId);
+  const { data, error } = await query;
+  if (error) {
+    rows.innerHTML = `<tr><td colspan="4">${escapeHtml(error.message)}</td></tr>`;
+    setMessage($("attendanceMessage"), error.message, "error");
+    return;
+  }
+  const studentsRes = await db.from("students").select("id, first_name, middle_name, last_name");
+  const studentMap = new Map((studentsRes.data || []).map(s => [s.id, [s.first_name,s.middle_name,s.last_name].filter(Boolean).join(" ")]));
+  rows.innerHTML = (data || []).map(r => `
+    <tr>
+      <td>${escapeHtml(studentMap.get(r.student_id) || "Student")}</td>
+      <td>${formatDate(r.attendance_date)}</td>
+      <td>${escapeHtml(r.status || "")}</td>
+      <td>${escapeHtml(r.remarks || "")}</td>
+    </tr>`).join("") || `<tr><td colspan="4">No attendance records yet.</td></tr>`;
+}
+
+async function saveAttendanceRecord() {
+  const studentId = $("attendanceStudent")?.value;
+  const attendanceDate = $("attendanceDate")?.value;
+  const status = $("attendanceStatus")?.value;
+  const remarks = $("attendanceRemarks")?.value.trim() || null;
+  const msg = $("attendanceMessage");
+  if (!studentId || !attendanceDate) {
+    setMessage(msg, "Please select a student and attendance date.", "error");
+    return;
+  }
+  const btn = $("saveAttendance");
+  if (btn) { btn.disabled = true; btn.textContent = "SAVING…"; }
+  const { error } = await db.from("attendance").insert({
+    student_id: studentId,
+    attendance_date: attendanceDate,
+    status,
+    remarks
+  });
+  if (error) {
+    setMessage(msg, "Unable to save attendance: " + error.message, "error");
+  } else {
+    setMessage(msg, "Attendance saved successfully.", "success");
+    if ($("attendanceRemarks")) $("attendanceRemarks").value = "";
+    await loadAdminAttendance();
+  }
+  if (btn) { btn.disabled = false; btn.textContent = "SAVE ATTENDANCE"; }
+}
+
+async function ensureStudentAttendancePanel(user, profile) {
+  let panel = $("studentAttendancePanel");
+  if (panel) return panel;
+  const area = ensurePortalMessageArea();
+  panel = document.createElement("div");
+  panel.id = "studentAttendancePanel";
+  panel.className = "welcome-card";
+  panel.innerHTML = `
+    <p class="eyebrow">ATTENDANCE</p>
+    <h3>Attendance History</h3>
+    <div class="admin-table-wrap">
+      <table class="admin-table">
+        <thead><tr><th>Date</th><th>Status</th><th>Remarks</th></tr></thead>
+        <tbody id="studentAttendanceRows"><tr><td colspan="3">Loading attendance…</td></tr></tbody>
+      </table>
+    </div>
+  `;
+  area.appendChild(panel);
+  const { data, error } = await db.from("attendance")
+    .select("attendance_date, status, remarks")
+    .eq("student_id", user.id)
+    .order("attendance_date", { ascending: false })
+    .limit(100);
+  const rows = $("studentAttendanceRows");
+  if (error) {
+    rows.innerHTML = `<tr><td colspan="3">${escapeHtml(error.message)}</td></tr>`;
+    return panel;
+  }
+  rows.innerHTML = (data || []).map(r => `
+    <tr><td>${formatDate(r.attendance_date)}</td><td>${escapeHtml(r.status || "")}</td><td>${escapeHtml(r.remarks || "")}</td></tr>
+  `).join("") || `<tr><td colspan="3">No attendance records yet.</td></tr>`;
+  return panel;
+}
+
+
 async function showAdminPortal(user) {
   const form = $("loginForm");
   const info = document.querySelector(".portal-info");
@@ -392,6 +551,9 @@ async function showAdminPortal(user) {
     </div>
   `);
   await loadAdminStudents();
+  ensureAttendancePanel();
+  await loadAttendanceStudents();
+  await loadAdminAttendance();
 }
 
 async function showPortalForUser(user) {
