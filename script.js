@@ -105,13 +105,18 @@ if (loginForm) {
     const msg = $("loginMessage");
     setMessage(msg, "Signing in…");
 
-    const { data, error } = await db.auth.signInWithPassword({ email, password });
-    if (error) {
-      setMessage(msg, error.message, "error");
-      return;
+    try {
+      const { data, error } = await db.auth.signInWithPassword({ email, password });
+      if (error) {
+        setMessage(msg, error.message, "error");
+        return;
+      }
+      await showPortalForUser(data.user);
+      setMessage(msg, "", "");
+    } catch (err) {
+      console.error("Student portal load failed:", err);
+      setMessage(msg, "Login succeeded, but the Student Portal could not load: " + (err?.message || String(err)), "error");
     }
-
-    await showPortalForUser(data.user);
   });
 }
 
@@ -181,11 +186,24 @@ function ensureSignOutButton() {
 }
 
 async function loadStudentProfile(user) {
-  const { data, error } = await db
+  const columns = "id, student_id, first_name, middle_name, last_name, birth_date, gender, phone, address, emergency_contact_name, emergency_contact_phone, current_belt, status, date_joined, created_at, photo_path";
+  let { data, error } = await db
     .from("students")
-    .select("id, student_id, first_name, middle_name, last_name, birth_date, gender, phone, address, emergency_contact_name, emergency_contact_phone, current_belt, status, date_joined, created_at, photo_path")
+    .select(columns)
     .eq("id", user.id)
     .maybeSingle();
+
+  // photo_path is an optional upgrade. If the column has not been added yet,
+  // retry with the original student columns so login is never blocked.
+  if (error && /photo_path|column/i.test(error.message || "")) {
+    const retry = await db
+      .from("students")
+      .select("id, student_id, first_name, middle_name, last_name, birth_date, gender, phone, address, emergency_contact_name, emergency_contact_phone, current_belt, status, date_joined, created_at")
+      .eq("id", user.id)
+      .maybeSingle();
+    data = retry.data;
+    error = retry.error;
+  }
   if (error) throw error;
   return data;
 }
