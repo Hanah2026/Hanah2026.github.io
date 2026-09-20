@@ -359,6 +359,76 @@ async function showPortalForUser(user) {
   document.getElementById("student-login")?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
+
+
+// Password recovery: Supabase redirects to the site with a recovery session.
+// Show a password-update form instead of sending the user to the normal login screen.
+function showPasswordRecovery() {
+  const section = $("student-login");
+  if (!section) return;
+  const container = section.querySelector(".container");
+  if (!container) return;
+
+  const existing = $("passwordRecoveryPanel");
+  if (existing) existing.remove();
+
+  const panel = document.createElement("div");
+  panel.id = "passwordRecoveryPanel";
+  panel.className = "portal-form";
+  panel.innerHTML = `
+    <h3>RESET PASSWORD</h3>
+    <p class="portal-note">Enter a new password for your academy account.</p>
+    <label>New password<input type="password" id="newPassword" minlength="6" placeholder="New password" required></label>
+    <label>Confirm password<input type="password" id="confirmPassword" minlength="6" placeholder="Confirm password" required></label>
+    <button class="btn primary" id="updatePasswordBtn" type="button">UPDATE PASSWORD</button>
+    <p id="recoveryMessage" class="form-message"></p>
+  `;
+  container.appendChild(panel);
+  section.scrollIntoView({ behavior: "smooth", block: "start" });
+
+  $("updatePasswordBtn").addEventListener("click", async () => {
+    const newPassword = $("newPassword").value;
+    const confirmPassword = $("confirmPassword").value;
+    const msg = $("recoveryMessage");
+
+    if (newPassword.length < 6) {
+      setMessage(msg, "Password must be at least 6 characters.", "error");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setMessage(msg, "Passwords do not match.", "error");
+      return;
+    }
+
+    const btn = $("updatePasswordBtn");
+    btn.disabled = true;
+    btn.textContent = "UPDATING…";
+    setMessage(msg, "Updating password…");
+
+    const { error } = await db.auth.updateUser({ password: newPassword });
+    if (error) {
+      setMessage(msg, "Password update failed: " + error.message, "error");
+      btn.disabled = false;
+      btn.textContent = "UPDATE PASSWORD";
+      return;
+    }
+
+    setMessage(msg, "Password updated successfully. You can now sign in with your new password.", "success");
+    setTimeout(async () => {
+      await db.auth.signOut();
+      window.location.hash = "student-login";
+      window.location.reload();
+    }, 1200);
+  });
+}
+
+// Handle Supabase recovery links after they redirect back to GitHub Pages.
+db.auth.onAuthStateChange((event) => {
+  if (event === "PASSWORD_RECOVERY") {
+    setTimeout(showPasswordRecovery, 0);
+  }
+});
+
 // Restore an existing session after refresh.
 db.auth.getSession().then(async ({ data }) => {
   if (data.session?.user) {
