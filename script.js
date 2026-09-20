@@ -277,24 +277,47 @@ async function loadAdminStudents() {
   }).join("");
 
   rows.querySelectorAll(".approve-btn").forEach(btn => {
-    btn.addEventListener("click", () => approveStudent(btn.dataset.id));
+    btn.addEventListener("click", async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      await approveStudent(btn.dataset.id, btn);
+    });
   });
 }
 
-async function approveStudent(studentId) {
+async function approveStudent(studentId, button) {
   const msg = $("adminMessage");
-  setMessage(msg, "Approving student…");
-  const { error } = await db
-    .from("students")
-    .update({ status: "Active", updated_at: new Date().toISOString() })
-    .eq("id", studentId);
-
-  if (error) {
-    setMessage(msg, error.message, "error");
+  if (!studentId) {
+    setMessage(msg, "Unable to approve: student ID is missing.", "error");
     return;
   }
-  setMessage(msg, "Student approved successfully.", "success");
-  await loadAdminStudents();
+
+  if (button) {
+    button.disabled = true;
+    button.textContent = "APPROVING…";
+  }
+  setMessage(msg, "Approving student…");
+
+  try {
+    const { error } = await db
+      .from("students")
+      .update({ status: "Active", updated_at: new Date().toISOString() })
+      .eq("id", studentId);
+
+    if (error) {
+      console.error("Approval update failed:", error);
+      setMessage(msg, "Approval failed: " + error.message, "error");
+      if (button) { button.disabled = false; button.textContent = "APPROVE"; }
+      return;
+    }
+
+    setMessage(msg, "Student approved successfully. Refreshing…", "success");
+    await loadAdminStudents();
+  } catch (err) {
+    console.error("Approval exception:", err);
+    setMessage(msg, "Approval failed: " + (err.message || String(err)), "error");
+    if (button) { button.disabled = false; button.textContent = "APPROVE"; }
+  }
 }
 
 async function showAdminPortal(user) {
