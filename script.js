@@ -276,13 +276,15 @@ async function loadAdminStudents() {
     </tr>`;
   }).join("");
 
-  rows.querySelectorAll(".approve-btn").forEach(btn => {
-    btn.addEventListener("click", async (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      await approveStudent(btn.dataset.id, btn);
-    });
-  });
+  // Use event delegation so the approval button continues to work reliably
+  // even when the table is rebuilt after refreshes.
+  rows.onclick = async (event) => {
+    const btn = event.target.closest(".approve-btn");
+    if (!btn) return;
+    event.preventDefault();
+    event.stopPropagation();
+    await approveStudent(btn.dataset.id, btn);
+  };
 }
 
 async function approveStudent(studentId, button) {
@@ -301,7 +303,7 @@ async function approveStudent(studentId, button) {
   try {
     const { error } = await db
       .from("students")
-      .update({ status: "Active", updated_at: new Date().toISOString() })
+      .update({ status: "Active" })
       .eq("id", studentId);
 
     if (error) {
