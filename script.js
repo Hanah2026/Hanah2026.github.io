@@ -270,7 +270,31 @@ async function showStudentPortal(user) {
         <div><strong>Emergency Contact</strong><br>${escapeHtml(profile.emergency_contact_name || "—")}</div>
         <div><strong>Emergency Phone</strong><br>${escapeHtml(profile.emergency_contact_phone || "—")}</div>
       </div>
-      <div class="admin-actions"><button id="studentPrintProfile" class="btn" type="button">🖨️ PRINT STUDENT PROFILE</button></div>
+      <div class="admin-actions">
+        <button id="studentEditProfile" class="btn" type="button">✏️ EDIT MY PROFILE</button>
+        <button id="studentPrintProfile" class="btn outline" type="button">🖨️ PRINT STUDENT PROFILE</button>
+      </div>
+      <div id="studentEditPanel" class="welcome-card" style="display:none;margin-top:18px;">
+        <p class="eyebrow">✏️ EDIT MY PROFILE</p>
+        <h3>Update Your Personal Information</h3>
+        <p class="portal-note">You can update your personal and emergency-contact information. Student ID, belt, status, and date joined are controlled by the academy.</p>
+        <div class="admin-form-grid">
+          <label>First Name<input id="editFirstName" type="text" autocomplete="given-name"></label>
+          <label>Middle Name<input id="editMiddleName" type="text" autocomplete="additional-name"></label>
+          <label>Last Name<input id="editLastName" type="text" autocomplete="family-name"></label>
+          <label>Birth Date<input id="editBirthDate" type="date"></label>
+          <label>Gender<select id="editGender"><option value="">— Select —</option><option value="Male">Male</option><option value="Female">Female</option><option value="Other">Other</option></select></label>
+          <label>Phone<input id="editPhone" type="tel" autocomplete="tel"></label>
+          <label>Address<textarea id="editAddress" rows="3" autocomplete="street-address"></textarea></label>
+          <label>Emergency Contact<input id="editEmergencyName" type="text"></label>
+          <label>Emergency Phone<input id="editEmergencyPhone" type="tel"></label>
+        </div>
+        <div class="admin-actions">
+          <button id="saveStudentProfile" class="btn" type="button">💾 SAVE CHANGES</button>
+          <button id="cancelStudentEdit" class="btn outline" type="button">CANCEL</button>
+        </div>
+        <p id="studentEditMessage" class="form-message"></p>
+      </div>
     </div>
 
     <div class="welcome-card">
@@ -310,6 +334,13 @@ async function showStudentPortal(user) {
   `);
 
   $("studentPrintProfile")?.addEventListener("click", () => printStudentPortalProfile(profile, effectiveBelt, photoUrl));
+  $("studentEditProfile")?.addEventListener("click", () => openStudentProfileEditor(profile));
+  $("cancelStudentEdit")?.addEventListener("click", () => {
+    const panel = $("studentEditPanel");
+    if (panel) panel.style.display = "none";
+    setMessage($("studentEditMessage"), "", "");
+  });
+  $("saveStudentProfile")?.addEventListener("click", () => saveStudentProfile(user.id));
   $("studentChangePassword")?.addEventListener("click", changeStudentPassword);
 
   // Load optional portal sections in the background so authentication never remains
@@ -361,6 +392,68 @@ async function loadStudentPortalCertificates(userId) {
     if (urlError || !urlData?.signedUrl) { alert("Unable to open this certificate: " + (urlError?.message || "signed URL unavailable")); return; }
     window.open(urlData.signedUrl, "_blank", "noopener");
   };
+}
+
+function openStudentProfileEditor(profile) {
+  const panel = $("studentEditPanel");
+  if (!panel) return;
+  panel.style.display = "block";
+  $("editFirstName").value = profile.first_name || "";
+  $("editMiddleName").value = profile.middle_name || "";
+  $("editLastName").value = profile.last_name || "";
+  $("editBirthDate").value = profile.birth_date || "";
+  $("editGender").value = profile.gender || "";
+  $("editPhone").value = profile.phone || "";
+  $("editAddress").value = profile.address || "";
+  $("editEmergencyName").value = profile.emergency_contact_name || "";
+  $("editEmergencyPhone").value = profile.emergency_contact_phone || "";
+  setMessage($("studentEditMessage"), "", "");
+  panel.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+async function saveStudentProfile(userId) {
+  const msg = $("studentEditMessage");
+  const firstName = $("editFirstName")?.value.trim() || "";
+  const middleName = $("editMiddleName")?.value.trim() || "";
+  const lastName = $("editLastName")?.value.trim() || "";
+  if (!firstName || !lastName) {
+    setMessage(msg, "First Name and Last Name are required.", "error");
+    return;
+  }
+
+  setMessage(msg, "Saving your profile…");
+  const updates = {
+    first_name: firstName,
+    middle_name: middleName || null,
+    last_name: lastName,
+    birth_date: $("editBirthDate")?.value || null,
+    gender: $("editGender")?.value || null,
+    phone: $("editPhone")?.value.trim() || null,
+    address: $("editAddress")?.value.trim() || null,
+    emergency_contact_name: $("editEmergencyName")?.value.trim() || null,
+    emergency_contact_phone: $("editEmergencyPhone")?.value.trim() || null
+  };
+
+  const { data, error } = await db
+    .from("students")
+    .update(updates)
+    .eq("id", userId)
+    .select("id, student_id, first_name, middle_name, last_name, birth_date, gender, phone, address, emergency_contact_name, emergency_contact_phone, current_belt, status, date_joined, created_at, photo_path")
+    .maybeSingle();
+
+  if (error) {
+    setMessage(msg, "Profile update failed: " + error.message, "error");
+    return;
+  }
+  if (!data) {
+    setMessage(msg, "Profile was not updated. Please contact the academy administrator.", "error");
+    return;
+  }
+
+  setMessage(msg, "Profile updated successfully.", "success");
+  const panel = $("studentEditPanel");
+  if (panel) panel.style.display = "none";
+  setTimeout(() => window.location.reload(), 500);
 }
 
 async function changeStudentPassword() {
