@@ -560,25 +560,65 @@ function ensureStudentRecordPanel() {
         <h2 id="recordStudentName">Student Profile</h2>
         <p id="recordStudentId" class="admin-subtitle"></p>
       </div>
-      <button id="closeStudentRecord" class="btn outline" type="button">CLOSE</button>
+      <div class="admin-actions">
+        <button id="printStudentRecord" class="btn" type="button">PRINT RECORD</button>
+        <button id="editStudentRecord" class="btn outline" type="button">EDIT STUDENT</button>
+        <button id="closeStudentRecord" class="btn outline" type="button">CLOSE</button>
+      </div>
+    </div>
+    <div id="recordEditForm" class="welcome-card" style="display:none">
+      <h3>✏️ Edit Student Information</h3>
+      <div class="admin-form-grid">
+        <label>First Name<input id="editFirstName"></label>
+        <label>Middle Name<input id="editMiddleName"></label>
+        <label>Last Name<input id="editLastName"></label>
+        <label>Birth Date<input id="editBirthDate" type="date"></label>
+        <label>Gender<select id="editGender"><option value="">Select</option><option>Male</option><option>Female</option></select></label>
+        <label>Phone<input id="editPhone"></label>
+        <label>Address<input id="editAddress"></label>
+        <label>Emergency Contact<input id="editEmergencyName"></label>
+        <label>Emergency Phone<input id="editEmergencyPhone"></label>
+        <label>Status<select id="editStatus"><option>Active</option><option>Pending</option></select></label>
+      </div>
+      <div class="admin-actions"><button id="saveStudentEdit" class="btn" type="button">SAVE CHANGES</button><button id="cancelStudentEdit" class="btn outline" type="button">CANCEL</button></div>
     </div>
     <div class="welcome-card" id="recordSummary">Loading student profile…</div>
     <div class="admin-table-wrap">
       <h3>🥋 Belt Promotion History</h3>
-      <table class="admin-table"><thead><tr><th>Previous Belt</th><th>New Belt</th><th>Date</th><th>Examiner</th><th>Remarks</th></tr></thead><tbody id="recordPromotionRows"><tr><td colspan="5">Loading…</td></tr></tbody></table>
+      <table class="admin-table"><thead><tr><th>Previous Belt</th><th>New Belt</th><th>Date</th><th>Examiner</th><th>Remarks</th><th>Action</th></tr></thead><tbody id="recordPromotionRows"><tr><td colspan="6">Loading…</td></tr></tbody></table>
     </div>
     <div class="admin-table-wrap">
       <h3>📅 Attendance History</h3>
-      <table class="admin-table"><thead><tr><th>Date</th><th>Status</th><th>Remarks</th></tr></thead><tbody id="recordAttendanceRows"><tr><td colspan="3">Loading…</td></tr></tbody></table>
+      <table class="admin-table"><thead><tr><th>Date</th><th>Status</th><th>Remarks</th><th>Action</th></tr></thead><tbody id="recordAttendanceRows"><tr><td colspan="3">Loading…</td></tr></tbody></table>
     </div>
     <div class="admin-table-wrap">
       <h3>💳 Payment History</h3>
-      <table class="admin-table"><thead><tr><th>Date</th><th>Amount</th><th>Type</th><th>Reference</th><th>Status</th><th>Remarks</th></tr></thead><tbody id="recordPaymentRows"><tr><td colspan="6">Loading…</td></tr></tbody></table>
+      <div class="admin-actions"><button id="addPaymentRecord" class="btn" type="button">ADD PAYMENT</button></div>
+      <table class="admin-table"><thead><tr><th>Date</th><th>Amount</th><th>Type</th><th>Reference</th><th>Status</th><th>Remarks</th><th>Action</th></tr></thead><tbody id="recordPaymentRows"><tr><td colspan="6">Loading…</td></tr></tbody></table>
     </div>
-    <p id="recordMessage" class="form-message"></p>
+    <div id="paymentForm" class="welcome-card" style="display:none">
+    <h3>💳 Add Payment</h3>
+    <div class="admin-form-grid">
+      <label>Date<input id="paymentDate" type="date"></label>
+      <label>Amount<input id="paymentAmount" type="number" min="0" step="0.01"></label>
+      <label>Type<input id="paymentType" placeholder="Membership / Tuition / Exam"></label>
+      <label>Reference<input id="paymentReference"></label>
+      <label>Status<select id="paymentStatus"><option>Paid</option><option>Pending</option><option>Cancelled</option></select></label>
+      <label>Remarks<input id="paymentRemarks"></label>
+    </div>
+    <div class="admin-actions"><button id="savePayment" class="btn" type="button">SAVE PAYMENT</button><button id="cancelPayment" class="btn outline" type="button">CANCEL</button></div>
+  </div>
+  <p id="recordMessage" class="form-message"></p>
   `;
   container.appendChild(panel);
   $("closeStudentRecord")?.addEventListener("click", () => { panel.style.display = "none"; });
+  $("editStudentRecord")?.addEventListener("click", () => { $("recordEditForm").style.display = "block"; });
+  $("cancelStudentEdit")?.addEventListener("click", () => { $("recordEditForm").style.display = "none"; });
+  $("saveStudentEdit")?.addEventListener("click", () => saveStudentEdit(window.currentRecordStudentId));
+  $("printStudentRecord")?.addEventListener("click", printStudentRecord);
+  $("addPaymentRecord")?.addEventListener("click", () => { $("paymentForm").style.display = "block"; });
+  $("cancelPayment")?.addEventListener("click", () => { $("paymentForm").style.display = "none"; });
+  $("savePayment")?.addEventListener("click", () => savePaymentRecord(window.currentRecordStudentId));
   return panel;
 }
 
@@ -586,12 +626,13 @@ async function showStudentRecord(studentId) {
   const panel = ensureStudentRecordPanel();
   if (!panel || !studentId) return;
   panel.style.display = "block";
+  window.currentRecordStudentId = studentId;
   panel.scrollIntoView({ behavior: "smooth", block: "start" });
   const summary = $("recordSummary"), message = $("recordMessage");
   summary.innerHTML = "Loading student profile…";
-  $("recordPromotionRows").innerHTML = `<tr><td colspan="5">Loading…</td></tr>`;
-  $("recordAttendanceRows").innerHTML = `<tr><td colspan="3">Loading…</td></tr>`;
-  $("recordPaymentRows").innerHTML = `<tr><td colspan="6">Loading…</td></tr>`;
+  $("recordPromotionRows").innerHTML = `<tr><td colspan="6">Loading…</td></tr>`;
+  $("recordAttendanceRows").innerHTML = `<tr><td colspan="4">Loading…</td></tr>`;
+  $("recordPaymentRows").innerHTML = `<tr><td colspan="7">Loading…</td></tr>`;
   setMessage(message, "");
 
   const { data: student, error: studentError } = await db.from("students")
@@ -632,6 +673,18 @@ async function showStudentRecord(studentId) {
   const name = [student.first_name, student.middle_name, student.last_name].filter(Boolean).join(" ") || "Unnamed Student";
   $("recordStudentName").textContent = name;
   $("recordStudentId").textContent = `${repairedStudentId || "No Student ID"} • ${student.status || "Pending"}`;
+  $("editFirstName").value = student.first_name || "";
+  $("editMiddleName").value = student.middle_name || "";
+  $("editLastName").value = student.last_name || "";
+  $("editBirthDate").value = student.birth_date || "";
+  $("editGender").value = student.gender || "";
+  $("editPhone").value = student.phone || "";
+  $("editAddress").value = student.address || "";
+  $("editEmergencyName").value = student.emergency_contact_name || "";
+  $("editEmergencyPhone").value = student.emergency_contact_phone || "";
+  $("editStatus").value = student.status || "Active";
+  $("recordEditForm").style.display = "none";
+  $("paymentForm").style.display = "none";
   summary.innerHTML = `
     <div class="admin-form-grid">
       <div><strong>Student ID</strong><br>${escapeHtml(repairedStudentId || "—")}</div>
@@ -647,26 +700,100 @@ async function showStudentRecord(studentId) {
     </div>`;
 
   const [promotionsRes, attendanceRes, paymentsRes] = await Promise.all([
-    db.from("promotions").select("previous_belt,new_belt,promotion_date,examiner,remarks").eq("student_id", studentId).order("promotion_date", { ascending: false }),
-    db.from("attendance").select("attendance_date,status,remarks").eq("student_id", studentId).order("attendance_date", { ascending: false }).limit(200),
-    db.from("payments").select("payment_date,amount,payment_type,reference_number,status,remarks").eq("student_id", studentId).order("payment_date", { ascending: false }).limit(200)
+    db.from("promotions").select("id,previous_belt,new_belt,promotion_date,examiner,remarks").eq("student_id", studentId).order("promotion_date", { ascending: false }),
+    db.from("attendance").select("id,attendance_date,status,remarks").eq("student_id", studentId).order("attendance_date", { ascending: false }).limit(200),
+    db.from("payments").select("id,payment_date,amount,payment_type,reference_number,status,remarks").eq("student_id", studentId).order("payment_date", { ascending: false }).limit(200)
   ]);
 
   const promotionRows = $("recordPromotionRows");
-  if (promotionsRes.error) promotionRows.innerHTML = `<tr><td colspan="5">${escapeHtml(promotionsRes.error.message)}</td></tr>`;
-  else promotionRows.innerHTML = (promotionsRes.data || []).map(p => `<tr><td>${escapeHtml(p.previous_belt || "—")}</td><td>${escapeHtml(p.new_belt || "—")}</td><td>${formatDate(p.promotion_date)}</td><td>${escapeHtml(p.examiner || "—")}</td><td>${escapeHtml(p.remarks || "—")}</td></tr>`).join("") || `<tr><td colspan="5">No promotion records yet.</td></tr>`;
+  if (promotionsRes.error) promotionRows.innerHTML = `<tr><td colspan="6">${escapeHtml(promotionsRes.error.message)}</td></tr>`;
+  else promotionRows.innerHTML = (promotionsRes.data || []).map(p => `<tr><td>${escapeHtml(p.previous_belt || "—")}</td><td>${escapeHtml(p.new_belt || "—")}</td><td>${formatDate(p.promotion_date)}</td><td>${escapeHtml(p.examiner || "—")}</td><td>${escapeHtml(p.remarks || "—")}</td><td><button class="danger-btn delete-promotion-btn" data-id="${escapeHtml(p.id)}" type="button">DELETE</button></td></tr>`).join("") || `<tr><td colspan="6">No promotion records yet.</td></tr>`;
+  promotionRows.onclick = async (e) => { const b=e.target.closest(".delete-promotion-btn"); if(b) await deletePromotionRecord(b.dataset.id, studentId); };
 
   const attendanceRows = $("recordAttendanceRows");
-  if (attendanceRes.error) attendanceRows.innerHTML = `<tr><td colspan="3">${escapeHtml(attendanceRes.error.message)}</td></tr>`;
-  else attendanceRows.innerHTML = (attendanceRes.data || []).map(a => `<tr><td>${formatDate(a.attendance_date)}</td><td>${escapeHtml(a.status || "—")}</td><td>${escapeHtml(a.remarks || "—")}</td></tr>`).join("") || `<tr><td colspan="3">No attendance records yet.</td></tr>`;
+  if (attendanceRes.error) attendanceRows.innerHTML = `<tr><td colspan="4">${escapeHtml(attendanceRes.error.message)}</td></tr>`;
+  else attendanceRows.innerHTML = (attendanceRes.data || []).map(a => `<tr><td>${formatDate(a.attendance_date)}</td><td>${escapeHtml(a.status || "—")}</td><td>${escapeHtml(a.remarks || "—")}</td><td><button class="danger-btn delete-attendance-btn" data-id="${escapeHtml(a.id)}" type="button">DELETE</button></td></tr>`).join("") || `<tr><td colspan="4">No attendance records yet.</td></tr>`;
+  attendanceRows.onclick = async (e) => { const b=e.target.closest(".delete-attendance-btn"); if(b) await deleteAttendanceRecord(b.dataset.id, studentId); };
 
   const paymentRows = $("recordPaymentRows");
   if (paymentsRes.error) {
-    paymentRows.innerHTML = `<tr><td colspan="6">${escapeHtml(paymentsRes.error.message)}</td></tr>`;
-    setMessage(message, "Student profile loaded. Payment history needs administrator payment-table permission if Supabase blocks it.", "error");
+    paymentRows.innerHTML = `<tr><td colspan="7">${escapeHtml(paymentsRes.error.message)}</td></tr>`;
+    setMessage(message, "Payment history is currently read-only until the administrator payment policy is enabled.", "error");
   } else {
-    paymentRows.innerHTML = (paymentsRes.data || []).map(p => `<tr><td>${formatDate(p.payment_date)}</td><td>₱${escapeHtml(p.amount ?? "0")}</td><td>${escapeHtml(p.payment_type || "—")}</td><td>${escapeHtml(p.reference_number || "—")}</td><td>${escapeHtml(p.status || "—")}</td><td>${escapeHtml(p.remarks || "—")}</td></tr>`).join("") || `<tr><td colspan="6">No payment records yet.</td></tr>`;
+    paymentRows.innerHTML = (paymentsRes.data || []).map(p => `<tr><td>${formatDate(p.payment_date)}</td><td>₱${escapeHtml(p.amount ?? "0")}</td><td>${escapeHtml(p.payment_type || "—")}</td><td>${escapeHtml(p.reference_number || "—")}</td><td>${escapeHtml(p.status || "—")}</td><td>${escapeHtml(p.remarks || "—")}</td><td><button class="danger-btn delete-payment-btn" data-id="${escapeHtml(p.id)}" type="button">DELETE</button></td></tr>`).join("") || `<tr><td colspan="7">No payment records yet.</td></tr>`;
+    paymentRows.onclick = async (e) => { const b=e.target.closest(".delete-payment-btn"); if(b) await deletePaymentRecord(b.dataset.id, studentId); };
   }
+}
+
+
+async function saveStudentEdit(studentId) {
+  if (!studentId) return;
+  const msg = $("recordMessage");
+  const payload = {
+    first_name: $("editFirstName").value.trim(), middle_name: $("editMiddleName").value.trim() || null,
+    last_name: $("editLastName").value.trim(), birth_date: $("editBirthDate").value || null,
+    gender: $("editGender").value || null, phone: $("editPhone").value.trim() || null,
+    address: $("editAddress").value.trim() || null, emergency_contact_name: $("editEmergencyName").value.trim() || null,
+    emergency_contact_phone: $("editEmergencyPhone").value.trim() || null, status: $("editStatus").value
+  };
+  if (!payload.first_name || !payload.last_name) { setMessage(msg, "First name and last name are required.", "error"); return; }
+  const { error } = await db.from("students").update(payload).eq("id", studentId);
+  if (error) { setMessage(msg, "Update failed: " + error.message, "error"); return; }
+  setMessage(msg, "Student information updated successfully.", "success");
+  await showStudentRecord(studentId);
+  await loadAdminStudents();
+}
+
+async function deletePromotionRecord(recordId, studentId) {
+  if (!recordId || !confirm("Delete this promotion record? This cannot be undone.")) return;
+  const { error } = await db.from("promotions").delete().eq("id", recordId);
+  if (error) { setMessage($("recordMessage"), "Delete failed: " + error.message, "error"); return; }
+  setMessage($("recordMessage"), "Promotion record deleted.", "success");
+  await showStudentRecord(studentId);
+  await loadPromotionAdmin();
+}
+
+async function deleteAttendanceRecord(recordId, studentId) {
+  if (!recordId || !confirm("Delete this attendance record? This cannot be undone.")) return;
+  const { error } = await db.from("attendance").delete().eq("id", recordId);
+  if (error) { setMessage($("recordMessage"), "Delete failed: " + error.message, "error"); return; }
+  setMessage($("recordMessage"), "Attendance record deleted.", "success");
+  await showStudentRecord(studentId);
+  await loadAdminAttendance();
+}
+
+async function savePaymentRecord(studentId) {
+  if (!studentId) return;
+  const msg = $("recordMessage");
+  const date = $("paymentDate").value, amount = $("paymentAmount").value, type = $("paymentType").value.trim();
+  if (!date || !amount || !type) { setMessage(msg, "Payment date, amount, and type are required.", "error"); return; }
+  const { error } = await db.from("payments").insert({
+    student_id: studentId, payment_date: date, amount: Number(amount), payment_type: type,
+    reference_number: $("paymentReference").value.trim() || null, status: $("paymentStatus").value,
+    remarks: $("paymentRemarks").value.trim() || null
+  });
+  if (error) { setMessage(msg, "Payment save failed: " + error.message, "error"); return; }
+  $("paymentForm").style.display = "none";
+  $("paymentDate").value = ""; $("paymentAmount").value = ""; $("paymentType").value = ""; $("paymentReference").value = ""; $("paymentRemarks").value = "";
+  setMessage(msg, "Payment recorded successfully.", "success");
+  await showStudentRecord(studentId);
+}
+
+async function deletePaymentRecord(recordId, studentId) {
+  if (!recordId || !confirm("Delete this payment record? This cannot be undone.")) return;
+  const { error } = await db.from("payments").delete().eq("id", recordId);
+  if (error) { setMessage($("recordMessage"), "Delete failed: " + error.message, "error"); return; }
+  setMessage($("recordMessage"), "Payment record deleted.", "success");
+  await showStudentRecord(studentId);
+}
+
+function printStudentRecord() {
+  const panel = $("studentRecordPanel");
+  if (!panel) return;
+  const printWindow = window.open("", "_blank", "width=1000,height=800");
+  if (!printWindow) { setMessage($("recordMessage"), "Please allow pop-ups to print the record.", "error"); return; }
+  printWindow.document.write(`<!doctype html><html><head><title>Student Master Record</title><style>body{font-family:Arial,sans-serif;padding:30px;color:#111}h1,h2,h3{margin-bottom:8px}.admin-table{width:100%;border-collapse:collapse;margin:12px 0 25px}.admin-table th,.admin-table td{border:1px solid #999;padding:7px;text-align:left}.admin-form-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}.welcome-card{padding:10px;margin:10px 0;border:1px solid #ccc}.admin-head{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #111;margin-bottom:20px}.btn,.admin-actions,#recordEditForm,#paymentForm,#recordMessage{display:none}</style></head><body>${panel.innerHTML}</body></html>`);
+  printWindow.document.close(); printWindow.focus(); setTimeout(() => printWindow.print(), 300);
 }
 
 
