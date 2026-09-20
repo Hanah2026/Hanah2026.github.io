@@ -928,7 +928,20 @@ function ensureStudentRecordPanel() {
   $("saveStudentEdit")?.addEventListener("click", () => saveStudentEdit(window.currentRecordStudentId));
   $("printStudentRecord")?.addEventListener("click", printStudentRecord);
   $("printStudentCard")?.addEventListener("click", printStudentProfileCard);
-  $("uploadStudentPhoto")?.addEventListener("click", () => uploadStudentPhoto(window.currentRecordStudentId));
+  $("uploadStudentPhoto")?.addEventListener("click", () => {
+    const input = $("studentPhotoFile");
+    if (!input) return;
+    if (!input.files || !input.files.length) {
+      input.click();
+      return;
+    }
+    uploadStudentPhoto(window.currentRecordStudentId);
+  });
+  $("studentPhotoFile")?.addEventListener("change", () => {
+    if ($("studentPhotoFile")?.files?.length) {
+      uploadStudentPhoto(window.currentRecordStudentId);
+    }
+  });
   $("uploadCertificate")?.addEventListener("click", () => uploadCertificate(window.currentRecordStudentId));
   $("addPaymentRecord")?.addEventListener("click", () => { $("paymentForm").style.display = "block"; });
   $("cancelPayment")?.addEventListener("click", () => { $("paymentForm").style.display = "none"; });
