@@ -316,8 +316,8 @@ async function loadAdminStudents() {
     const name = [s.first_name, s.middle_name, s.last_name].filter(Boolean).join(" ") || "Unnamed Student";
     const status = s.status || "Pending";
     const action = status.toLowerCase() === "active"
-      ? `<span class="status-active">ACTIVE</span>`
-      : `<button class="approve-btn" data-id="${escapeHtml(s.id)}" type="button">APPROVE</button>`;
+      ? `<span class="status-active">ACTIVE</span> <button class="view-profile-btn" data-id="${escapeHtml(s.id)}" type="button">VIEW PROFILE</button>`
+      : `<button class="approve-btn" data-id="${escapeHtml(s.id)}" type="button">APPROVE</button> <button class="view-profile-btn" data-id="${escapeHtml(s.id)}" type="button">VIEW PROFILE</button>`;
     return `<tr>
       <td><strong>${escapeHtml(name)}</strong><small>${escapeHtml(s.student_id || "")}</small></td>
       <td>Student account</td>
@@ -331,6 +331,13 @@ async function loadAdminStudents() {
   // Use event delegation so the approval button continues to work reliably
   // even when the table is rebuilt after refreshes.
   rows.onclick = async (event) => {
+    const profileBtn = event.target.closest(".view-profile-btn");
+    if (profileBtn) {
+      event.preventDefault();
+      event.stopPropagation();
+      await showStudentRecord(profileBtn.dataset.id);
+      return;
+    }
     const btn = event.target.closest(".approve-btn");
     if (!btn) return;
     event.preventDefault();
@@ -535,6 +542,108 @@ async function ensureStudentAttendancePanel(user, profile) {
 
 
 
+// Student Master Record
+function ensureStudentRecordPanel() {
+  let panel = $("studentRecordPanel");
+  if (panel) return panel;
+  const section = $("student-login");
+  const container = section?.querySelector(".container");
+  if (!container) return null;
+  panel = document.createElement("div");
+  panel.id = "studentRecordPanel";
+  panel.className = "admin-dashboard student-record-panel";
+  panel.style.display = "none";
+  panel.innerHTML = `
+    <div class="admin-head">
+      <div>
+        <p class="eyebrow">STUDENT MASTER RECORD</p>
+        <h2 id="recordStudentName">Student Profile</h2>
+        <p id="recordStudentId" class="admin-subtitle"></p>
+      </div>
+      <button id="closeStudentRecord" class="btn outline" type="button">CLOSE</button>
+    </div>
+    <div class="welcome-card" id="recordSummary">Loading student profile…</div>
+    <div class="admin-table-wrap">
+      <h3>🥋 Belt Promotion History</h3>
+      <table class="admin-table"><thead><tr><th>Previous Belt</th><th>New Belt</th><th>Date</th><th>Examiner</th><th>Remarks</th></tr></thead><tbody id="recordPromotionRows"><tr><td colspan="5">Loading…</td></tr></tbody></table>
+    </div>
+    <div class="admin-table-wrap">
+      <h3>📅 Attendance History</h3>
+      <table class="admin-table"><thead><tr><th>Date</th><th>Status</th><th>Remarks</th></tr></thead><tbody id="recordAttendanceRows"><tr><td colspan="3">Loading…</td></tr></tbody></table>
+    </div>
+    <div class="admin-table-wrap">
+      <h3>💳 Payment History</h3>
+      <table class="admin-table"><thead><tr><th>Date</th><th>Amount</th><th>Type</th><th>Reference</th><th>Status</th><th>Remarks</th></tr></thead><tbody id="recordPaymentRows"><tr><td colspan="6">Loading…</td></tr></tbody></table>
+    </div>
+    <p id="recordMessage" class="form-message"></p>
+  `;
+  container.appendChild(panel);
+  $("closeStudentRecord")?.addEventListener("click", () => { panel.style.display = "none"; });
+  return panel;
+}
+
+async function showStudentRecord(studentId) {
+  const panel = ensureStudentRecordPanel();
+  if (!panel || !studentId) return;
+  panel.style.display = "block";
+  panel.scrollIntoView({ behavior: "smooth", block: "start" });
+  const summary = $("recordSummary"), message = $("recordMessage");
+  summary.innerHTML = "Loading student profile…";
+  $("recordPromotionRows").innerHTML = `<tr><td colspan="5">Loading…</td></tr>`;
+  $("recordAttendanceRows").innerHTML = `<tr><td colspan="3">Loading…</td></tr>`;
+  $("recordPaymentRows").innerHTML = `<tr><td colspan="6">Loading…</td></tr>`;
+  setMessage(message, "");
+
+  const { data: student, error: studentError } = await db.from("students")
+    .select("id, student_id, first_name, middle_name, last_name, birth_date, gender, phone, address, emergency_contact_name, emergency_contact_phone, current_belt, status, date_joined, created_at")
+    .eq("id", studentId).maybeSingle();
+  if (studentError || !student) {
+    const err = studentError?.message || "Student record not found.";
+    summary.innerHTML = `<p class="form-message error">${escapeHtml(err)}</p>`;
+    return;
+  }
+
+  const name = [student.first_name, student.middle_name, student.last_name].filter(Boolean).join(" ") || "Unnamed Student";
+  $("recordStudentName").textContent = name;
+  $("recordStudentId").textContent = `${student.student_id || "No Student ID"} • ${student.status || "Pending"}`;
+  summary.innerHTML = `
+    <div class="admin-form-grid">
+      <div><strong>Student ID</strong><br>${escapeHtml(student.student_id || "—")}</div>
+      <div><strong>Current Belt</strong><br>${escapeHtml(student.current_belt || "White Belt")}</div>
+      <div><strong>Status</strong><br>${escapeHtml(student.status || "Pending")}</div>
+      <div><strong>Date Joined</strong><br>${formatDate(student.date_joined || student.created_at)}</div>
+      <div><strong>Birth Date</strong><br>${formatDate(student.birth_date)}</div>
+      <div><strong>Gender</strong><br>${escapeHtml(student.gender || "—")}</div>
+      <div><strong>Phone</strong><br>${escapeHtml(student.phone || "—")}</div>
+      <div><strong>Address</strong><br>${escapeHtml(student.address || "—")}</div>
+      <div><strong>Emergency Contact</strong><br>${escapeHtml(student.emergency_contact_name || "—")}</div>
+      <div><strong>Emergency Phone</strong><br>${escapeHtml(student.emergency_contact_phone || "—")}</div>
+    </div>`;
+
+  const [promotionsRes, attendanceRes, paymentsRes] = await Promise.all([
+    db.from("promotions").select("previous_belt,new_belt,promotion_date,examiner,remarks").eq("student_id", studentId).order("promotion_date", { ascending: false }),
+    db.from("attendance").select("attendance_date,status,remarks").eq("student_id", studentId).order("attendance_date", { ascending: false }).limit(200),
+    db.from("payments").select("payment_date,amount,payment_type,reference_number,status,remarks").eq("student_id", studentId).order("payment_date", { ascending: false }).limit(200)
+  ]);
+
+  const promotionRows = $("recordPromotionRows");
+  if (promotionsRes.error) promotionRows.innerHTML = `<tr><td colspan="5">${escapeHtml(promotionsRes.error.message)}</td></tr>`;
+  else promotionRows.innerHTML = (promotionsRes.data || []).map(p => `<tr><td>${escapeHtml(p.previous_belt || "—")}</td><td>${escapeHtml(p.new_belt || "—")}</td><td>${formatDate(p.promotion_date)}</td><td>${escapeHtml(p.examiner || "—")}</td><td>${escapeHtml(p.remarks || "—")}</td></tr>`).join("") || `<tr><td colspan="5">No promotion records yet.</td></tr>`;
+
+  const attendanceRows = $("recordAttendanceRows");
+  if (attendanceRes.error) attendanceRows.innerHTML = `<tr><td colspan="3">${escapeHtml(attendanceRes.error.message)}</td></tr>`;
+  else attendanceRows.innerHTML = (attendanceRes.data || []).map(a => `<tr><td>${formatDate(a.attendance_date)}</td><td>${escapeHtml(a.status || "—")}</td><td>${escapeHtml(a.remarks || "—")}</td></tr>`).join("") || `<tr><td colspan="3">No attendance records yet.</td></tr>`;
+
+  const paymentRows = $("recordPaymentRows");
+  if (paymentsRes.error) {
+    paymentRows.innerHTML = `<tr><td colspan="6">${escapeHtml(paymentsRes.error.message)}</td></tr>`;
+    setMessage(message, "Student profile loaded. Payment history needs administrator payment-table permission if Supabase blocks it.", "error");
+  } else {
+    paymentRows.innerHTML = (paymentsRes.data || []).map(p => `<tr><td>${formatDate(p.payment_date)}</td><td>₱${escapeHtml(p.amount ?? "0")}</td><td>${escapeHtml(p.payment_type || "—")}</td><td>${escapeHtml(p.reference_number || "—")}</td><td>${escapeHtml(p.status || "—")}</td><td>${escapeHtml(p.remarks || "—")}</td></tr>`).join("") || `<tr><td colspan="6">No payment records yet.</td></tr>`;
+  }
+}
+
+
 function ensurePromotionPanel() {
   let panel = $("promotionPanel");
   if (panel) return panel;
@@ -607,24 +716,6 @@ async function showAdminPortal(user) {
   if (form) form.style.display = "none";
   if (info) info.style.display = "none";
   panel.style.display = "block";
-  panel.style.visibility = "visible";
-  panel.style.opacity = "1";
-  panel.style.position = "relative";
-
-  // Always create the promotion section immediately after the main admin dashboard
-  // so it is visible without relying on a later async render or page styling.
-  const promotionPanel = ensurePromotionPanel();
-  if (promotionPanel) {
-    promotionPanel.style.display = "block";
-    promotionPanel.style.visibility = "visible";
-    promotionPanel.style.opacity = "1";
-    promotionPanel.style.position = "relative";
-    const attendancePanel = $("attendancePanel");
-    if (attendancePanel && attendancePanel.parentNode) {
-      attendancePanel.parentNode.insertBefore(promotionPanel, attendancePanel);
-    }
-  }
-
   area.insertAdjacentHTML("afterbegin", `
     <div class="welcome-card admin-welcome">
       <p class="eyebrow">AUTHORIZED ADMINISTRATOR</p>
@@ -633,11 +724,10 @@ async function showAdminPortal(user) {
     </div>
   `);
   await loadAdminStudents();
-  ensurePromotionPanel();
-  await loadPromotionAdmin();
   ensureAttendancePanel();
   await loadAttendanceStudents();
   await loadAdminAttendance();
+  await loadPromotionAdmin();
 }
 
 async function showPortalForUser(user) {
