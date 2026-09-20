@@ -603,13 +603,39 @@ async function showStudentRecord(studentId) {
     return;
   }
 
+  // Repair missing Student ID and synchronize the displayed current belt from the latest promotion.
+  // This keeps the Master Record accurate even if an older student row was created before these features were installed.
+  let repairedStudentId = student.student_id;
+  if (!repairedStudentId) {
+    try {
+      repairedStudentId = await generateStudentId();
+      const { error: idError } = await db.from("students").update({ student_id: repairedStudentId }).eq("id", studentId);
+      if (idError) repairedStudentId = null;
+    } catch (e) {
+      console.warn("Unable to repair Student ID", e);
+    }
+  }
+
+  const { data: latestPromotion } = await db.from("promotions")
+    .select("new_belt,promotion_date")
+    .eq("student_id", studentId)
+    .order("promotion_date", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const effectiveBelt = latestPromotion?.new_belt || student.current_belt || "White Belt";
+  if (latestPromotion?.new_belt && latestPromotion.new_belt !== student.current_belt) {
+    const { error: beltError } = await db.from("students").update({ current_belt: latestPromotion.new_belt }).eq("id", studentId);
+    if (beltError) console.warn("Unable to synchronize current belt", beltError);
+  }
+
   const name = [student.first_name, student.middle_name, student.last_name].filter(Boolean).join(" ") || "Unnamed Student";
   $("recordStudentName").textContent = name;
-  $("recordStudentId").textContent = `${student.student_id || "No Student ID"} • ${student.status || "Pending"}`;
+  $("recordStudentId").textContent = `${repairedStudentId || "No Student ID"} • ${student.status || "Pending"}`;
   summary.innerHTML = `
     <div class="admin-form-grid">
-      <div><strong>Student ID</strong><br>${escapeHtml(student.student_id || "—")}</div>
-      <div><strong>Current Belt</strong><br>${escapeHtml(student.current_belt || "White Belt")}</div>
+      <div><strong>Student ID</strong><br>${escapeHtml(repairedStudentId || "—")}</div>
+      <div><strong>Current Belt</strong><br>${escapeHtml(effectiveBelt)}</div>
       <div><strong>Status</strong><br>${escapeHtml(student.status || "Pending")}</div>
       <div><strong>Date Joined</strong><br>${formatDate(student.date_joined || student.created_at)}</div>
       <div><strong>Birth Date</strong><br>${formatDate(student.birth_date)}</div>
