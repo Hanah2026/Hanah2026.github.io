@@ -618,6 +618,7 @@ async function showAdminPortal(user) {
   ensureAttendancePanel();
   await loadAttendanceStudents();
   await loadAdminAttendance();
+  await loadPromotionAdmin();
 }
 
 async function showPortalForUser(user) {
