@@ -1,97 +1,347 @@
-// HANAH NEHT TAEKWONDO ACADEMY
-// Real Supabase Authentication connection.
-// Only the publishable key is used in browser code.
-
 const SUPABASE_URL = "https://ztlnszexrwximmmomdui.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_aAK8s-mKAmV6JZdTyN_PIg_iifwClYn";
+const ADMIN_EMAIL = "cattleya16herculis14@gmail.com";
 
 const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 
-const menu = document.querySelector(".menu-btn");
+const $ = (id) => document.getElementById(id);
+
+function setMessage(el, message, type = "") {
+  if (!el) return;
+  el.textContent = message;
+  el.className = `form-message ${type}`.trim();
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function formatDate(value) {
+  if (!value) return "—";
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? value : d.toLocaleDateString();
+}
+
+// Mobile navigation
+const menuBtn = document.querySelector(".menu-btn");
 const nav = document.querySelector("nav");
-if (menu && nav) menu.onclick = () => nav.classList.toggle("open");
+if (menuBtn && nav) {
+  menuBtn.addEventListener("click", () => nav.classList.toggle("open"));
+  nav.querySelectorAll("a").forEach((a) => a.addEventListener("click", () => nav.classList.remove("open")));
+}
 
-const modal = document.getElementById("registerModal");
-const registerBtn = document.getElementById("registerBtn");
-const closeRegister = document.getElementById("closeRegister");
-
-function openRegistration() {
-  if (modal) {
-    modal.style.display = "flex";
+// Registration modal
+const modal = $("registerModal");
+const registerBtn = $("registerBtn");
+const closeRegister = $("closeRegister");
+if (registerBtn && modal) {
+  registerBtn.addEventListener("click", () => {
     modal.setAttribute("aria-hidden", "false");
-  }
+    modal.classList.add("show");
+  });
 }
-function closeRegistration() {
-  if (modal) {
-    modal.style.display = "none";
+if (closeRegister && modal) {
+  closeRegister.addEventListener("click", () => {
     modal.setAttribute("aria-hidden", "true");
-  }
+    modal.classList.remove("show");
+  });
 }
-if (registerBtn) registerBtn.onclick = openRegistration;
-if (closeRegister) closeRegister.onclick = closeRegistration;
-if (modal) modal.onclick = e => { if (e.target === modal) closeRegistration(); };
+if (modal) {
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) {
+      modal.setAttribute("aria-hidden", "true");
+      modal.classList.remove("show");
+    }
+  });
+}
 
-const registerForm = document.getElementById("registerForm");
+// Student registration
+const registerForm = $("registerForm");
 if (registerForm) {
-  registerForm.onsubmit = async e => {
+  registerForm.addEventListener("submit", async (e) => {
     e.preventDefault();
-    const msg = document.getElementById("registerMessage");
-    const first_name = document.getElementById("regFirstName").value.trim();
-    const last_name = document.getElementById("regLastName").value.trim();
-    const email = document.getElementById("regEmail").value.trim();
-    const password = document.getElementById("regPassword").value;
+    const firstName = $("regFirstName").value.trim();
+    const lastName = $("regLastName").value.trim();
+    const email = $("regEmail").value.trim().toLowerCase();
+    const password = $("regPassword").value;
+    const msg = $("registerMessage");
 
-    msg.textContent = "Creating student account…";
+    setMessage(msg, "Creating account…");
 
     const { data, error } = await db.auth.signUp({
       email,
       password,
       options: {
-        data: { first_name, last_name },
-        emailRedirectTo: window.location.origin + window.location.pathname
+        data: { first_name: firstName, last_name: lastName },
+        emailRedirectTo: "https://hanah2026.github.io/"
       }
     });
 
     if (error) {
-      msg.textContent = error.message;
+      setMessage(msg, error.message, "error");
       return;
     }
 
-    registerForm.reset();
     if (data.session) {
-      msg.textContent = "Account created successfully. Your academy status is Pending approval.";
+      setMessage(msg, "Account created successfully. You can now sign in.", "success");
     } else {
-      msg.textContent = "Account created. Please check your email to confirm the account, then sign in.";
+      setMessage(msg, "Account created. Please check your email to confirm the account, then sign in.", "success");
     }
-  };
+  });
 }
 
-const loginForm = document.getElementById("loginForm");
+// Login
+const loginForm = $("loginForm");
 if (loginForm) {
-  loginForm.onsubmit = async e => {
+  loginForm.addEventListener("submit", async (e) => {
     e.preventDefault();
-    const msg = document.getElementById("loginMessage");
-    const email = document.getElementById("email").value.trim();
-    const password = document.getElementById("password").value;
+    const email = $("email").value.trim().toLowerCase();
+    const password = $("password").value;
+    const msg = $("loginMessage");
+    setMessage(msg, "Signing in…");
 
-    msg.textContent = "Signing in…";
     const { data, error } = await db.auth.signInWithPassword({ email, password });
-
     if (error) {
-      msg.textContent = error.message;
+      setMessage(msg, error.message, "error");
       return;
     }
 
-    const { data: profile } = await db
-      .from("students")
-      .select("first_name,last_name,student_id,current_belt,status")
-      .eq("id", data.user.id)
-      .maybeSingle();
-
-    if (profile) {
-      msg.textContent = `Welcome, ${profile.first_name}! Status: ${profile.status}. Belt: ${profile.current_belt}.`;
-    } else {
-      msg.textContent = "Login successful. Your academy profile is being prepared.";
-    }
-  };
+    await showPortalForUser(data.user);
+  });
 }
+
+function ensurePortalMessageArea() {
+  let area = $("portalAccountArea");
+  if (area) return area;
+  const section = $("student-login");
+  if (!section) return null;
+  const container = section.querySelector(".container");
+  area = document.createElement("div");
+  area.id = "portalAccountArea";
+  area.className = "portal-account-area";
+  container.appendChild(area);
+  return area;
+}
+
+function ensureAdminPanel() {
+  let panel = $("adminDashboard");
+  if (panel) return panel;
+  const section = $("student-login");
+  const container = section.querySelector(".container");
+  panel = document.createElement("div");
+  panel.id = "adminDashboard";
+  panel.className = "admin-dashboard";
+  panel.innerHTML = `
+    <div class="admin-head">
+      <div>
+        <p class="eyebrow">ACADEMY ADMINISTRATION</p>
+        <h2>Academy <span>Admin Dashboard</span></h2>
+        <p class="admin-subtitle">Manage student registration and approve new academy members.</p>
+      </div>
+      <button id="adminRefresh" class="btn outline" type="button">REFRESH</button>
+    </div>
+    <div class="admin-stats">
+      <div><strong id="totalStudents">0</strong><small>Total Students</small></div>
+      <div><strong id="pendingStudents">0</strong><small>Pending</small></div>
+      <div><strong id="activeStudents">0</strong><small>Active</small></div>
+    </div>
+    <div class="admin-table-wrap">
+      <table class="admin-table">
+        <thead><tr><th>Student</th><th>Email</th><th>Belt</th><th>Status</th><th>Date Joined</th><th>Action</th></tr></thead>
+        <tbody id="studentRows"><tr><td colspan="6">Loading student records…</td></tr></tbody>
+      </table>
+    </div>
+    <p id="adminMessage" class="form-message"></p>
+  `;
+  container.appendChild(panel);
+  $("adminRefresh").addEventListener("click", loadAdminStudents);
+  return panel;
+}
+
+function ensureSignOutButton() {
+  let btn = $("portalSignOut");
+  if (btn) return btn;
+  const area = ensurePortalMessageArea();
+  btn = document.createElement("button");
+  btn.id = "portalSignOut";
+  btn.className = "btn outline portal-signout";
+  btn.type = "button";
+  btn.textContent = "SIGN OUT";
+  area.appendChild(btn);
+  btn.addEventListener("click", async () => {
+    await db.auth.signOut();
+    window.location.reload();
+  });
+  return btn;
+}
+
+async function loadStudentProfile(user) {
+  const { data, error } = await db
+    .from("students")
+    .select("id, student_id, first_name, middle_name, last_name, current_belt, status, date_joined")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+async function showStudentPortal(user) {
+  const form = $("loginForm");
+  const info = document.querySelector(".portal-info");
+  const profile = await loadStudentProfile(user);
+  const area = ensurePortalMessageArea();
+  ensureSignOutButton();
+
+  if (form) form.style.display = "none";
+  if (info) info.style.display = "none";
+
+  if (!profile) {
+    area.insertAdjacentHTML("afterbegin", `<div class="welcome-card"><h3>ACCOUNT FOUND</h3><p>Your account is active, but your academy profile has not been created yet.</p></div>`);
+    return;
+  }
+
+  const name = [profile.first_name, profile.middle_name, profile.last_name].filter(Boolean).join(" ");
+  area.insertAdjacentHTML("afterbegin", `
+    <div class="welcome-card">
+      <p class="eyebrow">STUDENT ACCOUNT</p>
+      <h3>Welcome, ${escapeHtml(name || user.email)}!</h3>
+      <div class="welcome-details">
+        <span><b>Status</b>${escapeHtml(profile.status || "Pending")}</span>
+        <span><b>Belt</b>${escapeHtml(profile.current_belt || "White Belt")}</span>
+        <span><b>Student ID</b>${escapeHtml(profile.student_id || "Pending assignment")}</span>
+        <span><b>Date Joined</b>${formatDate(profile.date_joined)}</span>
+      </div>
+      <p class="portal-note">Your academy account is connected successfully. Additional attendance, promotion and payment features can be added to this portal.</p>
+    </div>
+  `);
+}
+
+async function loadAdminStudents() {
+  const rows = $("studentRows");
+  const msg = $("adminMessage");
+  if (!rows) return;
+  rows.innerHTML = `<tr><td colspan="6">Loading student records…</td></tr>`;
+  setMessage(msg, "");
+
+  const { data, error } = await db
+    .from("students")
+    .select("id, student_id, first_name, middle_name, last_name, current_belt, status, date_joined, created_at, auth_user_email")
+    .order("created_at", { ascending: false });
+
+  // auth_user_email is not part of the schema; if the select fails, retry with the real columns.
+  let students = data;
+  if (error) {
+    const retry = await db
+      .from("students")
+      .select("id, student_id, first_name, middle_name, last_name, current_belt, status, date_joined, created_at")
+      .order("created_at", { ascending: false });
+    if (retry.error) {
+      rows.innerHTML = `<tr><td colspan="6">${escapeHtml(retry.error.message)}</td></tr>`;
+      setMessage(msg, retry.error.message, "error");
+      return;
+    }
+    students = retry.data || [];
+  }
+
+  students = students || [];
+  const pending = students.filter(s => (s.status || "Pending").toLowerCase() === "pending").length;
+  const active = students.filter(s => (s.status || "").toLowerCase() === "active").length;
+  $("totalStudents").textContent = students.length;
+  $("pendingStudents").textContent = pending;
+  $("activeStudents").textContent = active;
+
+  if (!students.length) {
+    rows.innerHTML = `<tr><td colspan="6">No student records found.</td></tr>`;
+    return;
+  }
+
+  rows.innerHTML = students.map((s) => {
+    const name = [s.first_name, s.middle_name, s.last_name].filter(Boolean).join(" ") || "Unnamed Student";
+    const status = s.status || "Pending";
+    const action = status.toLowerCase() === "active"
+      ? `<span class="status-active">ACTIVE</span>`
+      : `<button class="approve-btn" data-id="${escapeHtml(s.id)}" type="button">APPROVE</button>`;
+    return `<tr>
+      <td><strong>${escapeHtml(name)}</strong><small>${escapeHtml(s.student_id || "")}</small></td>
+      <td>Student account</td>
+      <td>${escapeHtml(s.current_belt || "White Belt")}</td>
+      <td><span class="status-${status.toLowerCase()}">${escapeHtml(status.toUpperCase())}</span></td>
+      <td>${formatDate(s.date_joined || s.created_at)}</td>
+      <td>${action}</td>
+    </tr>`;
+  }).join("");
+
+  rows.querySelectorAll(".approve-btn").forEach(btn => {
+    btn.addEventListener("click", () => approveStudent(btn.dataset.id));
+  });
+}
+
+async function approveStudent(studentId) {
+  const msg = $("adminMessage");
+  setMessage(msg, "Approving student…");
+  const { error } = await db
+    .from("students")
+    .update({ status: "Active", updated_at: new Date().toISOString() })
+    .eq("id", studentId);
+
+  if (error) {
+    setMessage(msg, error.message, "error");
+    return;
+  }
+  setMessage(msg, "Student approved successfully.", "success");
+  await loadAdminStudents();
+}
+
+async function showAdminPortal(user) {
+  const form = $("loginForm");
+  const info = document.querySelector(".portal-info");
+  const panel = ensureAdminPanel();
+  const area = ensurePortalMessageArea();
+  ensureSignOutButton();
+
+  if (form) form.style.display = "none";
+  if (info) info.style.display = "none";
+  panel.style.display = "block";
+  area.insertAdjacentHTML("afterbegin", `
+    <div class="welcome-card admin-welcome">
+      <p class="eyebrow">AUTHORIZED ADMINISTRATOR</p>
+      <h3>Welcome, Master Reynaldo!</h3>
+      <p>Administrator account: ${escapeHtml(user.email)}</p>
+    </div>
+  `);
+  await loadAdminStudents();
+}
+
+async function showPortalForUser(user) {
+  if (!user) return;
+  // Clear previous dynamic portal content before rendering the current account.
+  const area = $("portalAccountArea");
+  if (area) area.remove();
+  const panel = $("adminDashboard");
+  if (panel) panel.remove();
+
+  if ((user.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
+    await showAdminPortal(user);
+  } else {
+    await showStudentPortal(user);
+  }
+
+  document.getElementById("student-login")?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+// Restore an existing session after refresh.
+db.auth.getSession().then(async ({ data }) => {
+  if (data.session?.user) {
+    try {
+      await showPortalForUser(data.session.user);
+    } catch (err) {
+      console.error(err);
+      setMessage($("loginMessage"), err.message || "Unable to load your account.", "error");
+    }
+  }
+});
