@@ -234,7 +234,7 @@ async function showStudentPortal(user) {
 
   let photoUrl = "";
   if (profile.photo_path) {
-    const { data } = await db.storage.from("student-documents").createSignedUrl(profile.photo_path, 3600);
+    const { data } = await db.storage.from("student-photos").createSignedUrl(profile.photo_path, 3600);
     photoUrl = data?.signedUrl || "";
   }
 
@@ -1042,7 +1042,7 @@ async function showStudentRecord(studentId) {
   const photoImg = $("recordStudentPhoto");
   let photoUrl = "";
   if (student.photo_path) {
-    const { data: photoData } = await db.storage.from("student-documents").createSignedUrl(student.photo_path, 3600);
+    const { data: photoData } = await db.storage.from("student-photos").createSignedUrl(student.photo_path, 3600);
     photoUrl = photoData?.signedUrl || "";
   }
   if (photoImg) {
@@ -1148,7 +1148,7 @@ async function uploadStudentPhoto(studentId) {
   const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
   const path = `students/${studentId}/photo.${ext}`;
   setMessage(msg, "Uploading student photo…");
-  const { error: uploadError } = await db.storage.from("student-documents").upload(path, file, { upsert: true, contentType: file.type });
+  const { error: uploadError } = await db.storage.from("student-photos").upload(path, file, { upsert: true, contentType: file.type });
   if (uploadError) { setMessage(msg, "Photo upload failed: " + uploadError.message, "error"); return; }
   const { error: updateError } = await db.from("students").update({ photo_path: path }).eq("id", studentId);
   if (updateError) { setMessage(msg, "Photo uploaded but profile update failed: " + updateError.message, "error"); return; }
