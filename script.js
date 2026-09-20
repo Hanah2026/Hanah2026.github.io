@@ -798,6 +798,45 @@ async function ensureStudentAttendancePanel(user, profile) {
 
 
 
+// QR Code support
+let qrCodeLibraryPromise = null;
+function ensureQRCodeLibrary() {
+  if (window.QRCode) return Promise.resolve();
+  if (qrCodeLibraryPromise) return qrCodeLibraryPromise;
+  qrCodeLibraryPromise = new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = "https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js";
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("QR Code library could not be loaded."));
+    document.head.appendChild(script);
+  });
+  return qrCodeLibraryPromise;
+}
+
+async function makeStudentQRCode(student) {
+  const sid = student?.student_id || "";
+  if (!sid) return "";
+  try {
+    await ensureQRCodeLibrary();
+    const holder = document.createElement("div");
+    holder.style.position = "fixed";
+    holder.style.left = "-10000px";
+    holder.style.top = "-10000px";
+    document.body.appendChild(holder);
+    const qrText = `HANAH NEHT TAEKWONDO ACADEMY\nStudent ID: ${sid}`;
+    new QRCode(holder, { text: qrText, width: 180, height: 180, correctLevel: QRCode.CorrectLevel.M });
+    await new Promise(r => setTimeout(r, 100));
+    const canvas = holder.querySelector("canvas");
+    const img = holder.querySelector("img");
+    const dataUrl = canvas ? canvas.toDataURL("image/png") : (img?.src || "");
+    holder.remove();
+    return dataUrl;
+  } catch (e) {
+    console.warn("QR code generation failed:", e);
+    return "";
+  }
+}
+
 // Student Master Record
 function ensureStudentRecordPanel() {
   let panel = $("studentRecordPanel");
@@ -977,7 +1016,21 @@ async function showStudentRecord(studentId) {
       <div><strong>Address</strong><br>${escapeHtml(student.address || "—")}</div>
       <div><strong>Emergency Contact</strong><br>${escapeHtml(student.emergency_contact_name || "—")}</div>
       <div><strong>Emergency Phone</strong><br>${escapeHtml(student.emergency_contact_phone || "—")}</div>
+    </div>
+    <div class="student-qr-box" style="margin-top:18px;padding:16px;border:1px solid #ddd;border-radius:12px;display:flex;align-items:center;gap:18px;flex-wrap:wrap;">
+      <div id="recordStudentQR" style="width:180px;height:180px;display:flex;align-items:center;justify-content:center;background:#fff;"></div>
+      <div><strong>STUDENT QR CODE</strong><p style="margin:6px 0 0;color:#666;font-size:13px;">Scan to read this student's academy ID.</p><div style="margin-top:8px;font-weight:700;">${escapeHtml(repairedStudentId || "—")}</div></div>
     </div>`;
+
+  const qrHolder = $("recordStudentQR");
+  if (qrHolder) {
+    try {
+      const qrDataUrl = await makeStudentQRCode(window.currentRecordData);
+      qrHolder.innerHTML = qrDataUrl ? `<img src="${qrDataUrl}" alt="Student QR Code" width="180" height="180">` : `<span style="font-size:12px;color:#888;text-align:center;">QR unavailable</span>`;
+    } catch (e) {
+      qrHolder.innerHTML = `<span style="font-size:12px;color:#888;text-align:center;">QR unavailable</span>`;
+    }
+  }
 
   const [promotionsRes, attendanceRes, paymentsRes, certificatesRes] = await Promise.all([
     db.from("promotions").select("id,previous_belt,new_belt,promotion_date,examiner,remarks").eq("student_id", studentId).order("promotion_date", { ascending: false }),
@@ -1152,7 +1205,7 @@ async function deletePaymentRecord(recordId, studentId) {
   await showStudentRecord(studentId);
 }
 
-function printStudentProfileCard() {
+async function printStudentProfileCard() {
   const student = window.currentRecordData;
   if (!student) { setMessage($("recordMessage"), "Student profile is still loading.", "error"); return; }
   const printWindow = window.open("", "_blank", "width=900,height=800");
@@ -1164,8 +1217,11 @@ function printStudentProfileCard() {
   const joined = formatDate(student.date_joined || student.created_at);
   const logo = new URL("hanah-neht-logo.png", window.location.href).href;
   const photo = student.photo_url ? `<img class="photo-img" src="${escapeHtml(student.photo_url)}" alt="Student photo">` : '<div class="photo">STUDENT<br>PHOTO</div>';
+  let qrDataUrl = "";
+  try { qrDataUrl = await makeStudentQRCode(student); } catch (e) {}
+  const qr = qrDataUrl ? `<div class="qr-wrap"><img src="${qrDataUrl}" alt="Student QR Code"><div>SCAN STUDENT QR</div></div>` : '';
   printWindow.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(name)} - Student Profile Card</title><style>
-  *{box-sizing:border-box}body{margin:0;background:#eee;font-family:Arial,sans-serif;color:#111;padding:24px}.card{width:780px;max-width:100%;margin:0 auto;background:#fff;border:2px solid #111;border-radius:16px;overflow:hidden;box-shadow:0 3px 12px rgba(0,0,0,.12)}.head{background:#111;color:#fff;padding:18px 24px;display:flex;align-items:center;gap:16px}.head img{width:64px;height:64px;object-fit:contain;background:#fff;border-radius:8px}.academy{font-size:13px;letter-spacing:1.5px}.academy strong{display:block;font-size:22px;letter-spacing:1px}.sub{font-size:11px;margin-top:4px}.body{padding:24px}.top{display:flex;gap:22px;align-items:flex-start}.photo{width:125px;height:155px;border:2px dashed #888;display:flex;align-items:center;justify-content:center;text-align:center;font-weight:bold;color:#777;font-size:14px;flex:none}.photo-img{width:125px;height:155px;border:2px solid #888;object-fit:cover;flex:none}.identity{flex:1}.name{font-size:28px;font-weight:800;margin:0 0 8px}.id{font-size:16px;font-weight:700;margin-bottom:14px}.badge{display:inline-block;padding:7px 12px;border:1px solid #111;border-radius:999px;margin-right:7px;font-weight:700}.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:22px}.field{border-bottom:1px solid #ccc;padding-bottom:8px}.label{font-size:10px;text-transform:uppercase;color:#666;letter-spacing:1px}.value{font-size:14px;font-weight:600;margin-top:3px}.section{margin-top:24px;border-top:2px solid #111;padding-top:10px}.section h3{margin:0 0 9px;font-size:15px}.sig{display:flex;gap:50px;margin-top:48px}.sig div{flex:1;border-top:1px solid #111;text-align:center;padding-top:7px;font-size:11px}.footer{text-align:center;font-size:10px;color:#666;padding:12px;border-top:1px solid #ddd}@media print{body{background:#fff;padding:0}.card{width:100%;border:2px solid #111;box-shadow:none}@page{size:A4;margin:12mm}}</style></head><body><div class="card"><div class="head"><img src="${logo}" alt="Hanah Neht logo"><div class="academy"><strong>HANAH NEHT TAEKWONDO ACADEMY</strong><span>KUKKIWON DOJANG • STUDENT PROFILE</span></div></div><div class="body"><div class="top">${photo}<div class="identity"><p class="name">${escapeHtml(name)}</p><div class="id">STUDENT ID: ${escapeHtml(sid)}</div><span class="badge">${escapeHtml(belt)}</span><span class="badge">${escapeHtml(status)}</span><div class="grid"><div class="field"><div class="label">Date Joined</div><div class="value">${escapeHtml(joined)}</div></div><div class="field"><div class="label">Birth Date</div><div class="value">${escapeHtml(formatDate(student.birth_date))}</div></div><div class="field"><div class="label">Gender</div><div class="value">${escapeHtml(student.gender || "—")}</div></div><div class="field"><div class="label">Phone</div><div class="value">${escapeHtml(student.phone || "—")}</div></div></div></div></div><div class="section"><h3>CONTACT & EMERGENCY INFORMATION</h3><div class="grid"><div class="field"><div class="label">Address</div><div class="value">${escapeHtml(student.address || "—")}</div></div><div class="field"><div class="label">Emergency Contact</div><div class="value">${escapeHtml(student.emergency_contact_name || "—")}</div></div><div class="field"><div class="label">Emergency Phone</div><div class="value">${escapeHtml(student.emergency_contact_phone || "—")}</div></div></div></div><div class="section"><h3>ACADEMY RECORD</h3><p style="font-size:13px;line-height:1.5;margin:0">This profile card is issued for academy identification and student record reference. Promotion, attendance, and payment details are maintained in the academy's online student management system.</p></div><div class="sig"><div>Student / Parent Signature</div><div>Head Coach / Examiner</div></div></div><div class="footer">HANAH NEHT TAEKWONDO ACADEMY • KUKKIWON DOJANG</div></div></body></html>`);
+  *{box-sizing:border-box}body{margin:0;background:#eee;font-family:Arial,sans-serif;color:#111;padding:24px}.card{width:780px;max-width:100%;margin:0 auto;background:#fff;border:2px solid #111;border-radius:16px;overflow:hidden;box-shadow:0 3px 12px rgba(0,0,0,.12)}.head{background:#111;color:#fff;padding:18px 24px;display:flex;align-items:center;gap:16px}.head img{width:64px;height:64px;object-fit:contain;background:#fff;border-radius:8px}.academy{font-size:13px;letter-spacing:1.5px}.academy strong{display:block;font-size:22px;letter-spacing:1px}.sub{font-size:11px;margin-top:4px}.body{padding:24px}.top{display:flex;gap:22px;align-items:flex-start}.photo{width:125px;height:155px;border:2px dashed #888;display:flex;align-items:center;justify-content:center;text-align:center;font-weight:bold;color:#777;font-size:14px;flex:none}.photo-img{width:125px;height:155px;border:2px solid #888;object-fit:cover;flex:none}.identity{flex:1}.name{font-size:28px;font-weight:800;margin:0 0 8px}.id{font-size:16px;font-weight:700;margin-bottom:14px}.badge{display:inline-block;padding:7px 12px;border:1px solid #111;border-radius:999px;margin-right:7px;font-weight:700}.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:22px}.field{border-bottom:1px solid #ccc;padding-bottom:8px}.label{font-size:10px;text-transform:uppercase;color:#666;letter-spacing:1px}.value{font-size:14px;font-weight:600;margin-top:3px}.qr-wrap{margin-left:auto;text-align:center;font-size:9px;font-weight:700}.qr-wrap img{display:block;width:130px;height:130px;margin-bottom:5px}.section{margin-top:24px;border-top:2px solid #111;padding-top:10px}.section h3{margin:0 0 9px;font-size:15px}.sig{display:flex;gap:50px;margin-top:48px}.sig div{flex:1;border-top:1px solid #111;text-align:center;padding-top:7px;font-size:11px}.footer{text-align:center;font-size:10px;color:#666;padding:12px;border-top:1px solid #ddd}@media print{body{background:#fff;padding:0}.card{width:100%;border:2px solid #111;box-shadow:none}@page{size:A4;margin:12mm}}</style></head><body><div class="card"><div class="head"><img src="${logo}" alt="Hanah Neht logo"><div class="academy"><strong>HANAH NEHT TAEKWONDO ACADEMY</strong><span>KUKKIWON DOJANG • STUDENT PROFILE</span></div></div><div class="body"><div class="top">${photo}<div class="identity"><p class="name">${escapeHtml(name)}</p><div class="id">STUDENT ID: ${escapeHtml(sid)}</div><span class="badge">${escapeHtml(belt)}</span><span class="badge">${escapeHtml(status)}</span><div class="grid"><div class="field"><div class="label">Date Joined</div><div class="value">${escapeHtml(joined)}</div></div><div class="field"><div class="label">Birth Date</div><div class="value">${escapeHtml(formatDate(student.birth_date))}</div></div><div class="field"><div class="label">Gender</div><div class="value">${escapeHtml(student.gender || "—")}</div></div><div class="field"><div class="label">Phone</div><div class="value">${escapeHtml(student.phone || "—")}</div></div></div></div>${qr}</div><div class="section"><h3>CONTACT & EMERGENCY INFORMATION</h3><div class="grid"><div class="field"><div class="label">Address</div><div class="value">${escapeHtml(student.address || "—")}</div></div><div class="field"><div class="label">Emergency Contact</div><div class="value">${escapeHtml(student.emergency_contact_name || "—")}</div></div><div class="field"><div class="label">Emergency Phone</div><div class="value">${escapeHtml(student.emergency_contact_phone || "—")}</div></div></div></div><div class="section"><h3>ACADEMY RECORD</h3><p style="font-size:13px;line-height:1.5;margin:0">This profile card is issued for academy identification and student record reference. Promotion, attendance, and payment details are maintained in the academy's online student management system.</p></div><div class="sig"><div>Student / Parent Signature</div><div>Head Coach / Examiner</div></div></div><div class="footer">HANAH NEHT TAEKWONDO ACADEMY • KUKKIWON DOJANG</div></div></body></html>`);
   printWindow.document.close(); printWindow.focus(); setTimeout(() => printWindow.print(), 400);
 }
 
