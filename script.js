@@ -748,19 +748,69 @@ async function saveStudentEdit(studentId) {
 }
 
 async function deletePromotionRecord(recordId, studentId) {
-  if (!recordId || !confirm("Delete this promotion record? This cannot be undone.")) return;
-  const { error } = await db.from("promotions").delete().eq("id", recordId);
-  if (error) { setMessage($("recordMessage"), "Delete failed: " + error.message, "error"); return; }
-  setMessage($("recordMessage"), "Promotion record deleted.", "success");
+  if (!recordId) {
+    setMessage($("recordMessage"), "Delete failed: promotion record ID is missing.", "error");
+    return;
+  }
+  if (!confirm("Delete this promotion record? This cannot be undone.")) return;
+
+  const btn = document.querySelector(`.delete-promotion-btn[data-id="${CSS.escape(String(recordId))}"]`);
+  if (btn) { btn.disabled = true; btn.textContent = "DELETING…"; }
+
+  const { data, error } = await db
+    .from("promotions")
+    .delete()
+    .eq("id", recordId)
+    .select("id");
+
+  if (error) {
+    console.error("Promotion delete failed:", error);
+    setMessage($("recordMessage"), "Delete failed: " + error.message, "error");
+    if (btn) { btn.disabled = false; btn.textContent = "DELETE"; }
+    return;
+  }
+
+  if (!data || data.length === 0) {
+    setMessage($("recordMessage"), "Delete was not completed. Supabase did not return the deleted record. Please check the promotion DELETE policy.", "error");
+    if (btn) { btn.disabled = false; btn.textContent = "DELETE"; }
+    return;
+  }
+
+  setMessage($("recordMessage"), "Promotion record deleted successfully.", "success");
   await showStudentRecord(studentId);
   await loadPromotionAdmin();
 }
 
 async function deleteAttendanceRecord(recordId, studentId) {
-  if (!recordId || !confirm("Delete this attendance record? This cannot be undone.")) return;
-  const { error } = await db.from("attendance").delete().eq("id", recordId);
-  if (error) { setMessage($("recordMessage"), "Delete failed: " + error.message, "error"); return; }
-  setMessage($("recordMessage"), "Attendance record deleted.", "success");
+  if (!recordId) {
+    setMessage($("recordMessage"), "Delete failed: attendance record ID is missing.", "error");
+    return;
+  }
+  if (!confirm("Delete this attendance record? This cannot be undone.")) return;
+
+  const btn = document.querySelector(`.delete-attendance-btn[data-id="${CSS.escape(String(recordId))}"]`);
+  if (btn) { btn.disabled = true; btn.textContent = "DELETING…"; }
+
+  const { data, error } = await db
+    .from("attendance")
+    .delete()
+    .eq("id", recordId)
+    .select("id");
+
+  if (error) {
+    console.error("Attendance delete failed:", error);
+    setMessage($("recordMessage"), "Delete failed: " + error.message, "error");
+    if (btn) { btn.disabled = false; btn.textContent = "DELETE"; }
+    return;
+  }
+
+  if (!data || data.length === 0) {
+    setMessage($("recordMessage"), "Delete was not completed. Supabase did not return the deleted record. Please check the attendance DELETE policy.", "error");
+    if (btn) { btn.disabled = false; btn.textContent = "DELETE"; }
+    return;
+  }
+
+  setMessage($("recordMessage"), "Attendance record deleted successfully.", "success");
   await showStudentRecord(studentId);
   await loadAdminAttendance();
 }
