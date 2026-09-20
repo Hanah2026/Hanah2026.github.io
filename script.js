@@ -312,10 +312,18 @@ async function showStudentPortal(user) {
   $("studentPrintProfile")?.addEventListener("click", () => printStudentPortalProfile(profile, effectiveBelt, photoUrl));
   $("studentChangePassword")?.addEventListener("click", changeStudentPassword);
 
-  await loadStudentPortalAttendance(user.id);
-  await loadStudentPortalPromotions(user.id);
-  await loadStudentPortalPayments(user.id);
-  await loadStudentPortalCertificates(user.id);
+  // Load optional portal sections in the background so authentication never remains
+  // stuck on “Signing in…” if one optional table/storage resource is unavailable.
+  Promise.allSettled([
+    loadStudentPortalAttendance(user.id),
+    loadStudentPortalPromotions(user.id),
+    loadStudentPortalPayments(user.id),
+    loadStudentPortalCertificates(user.id)
+  ]).then((results) => {
+    results.forEach((result) => {
+      if (result.status === "rejected") console.error("Student portal section failed:", result.reason);
+    });
+  });
 }
 
 async function loadStudentPortalAttendance(userId) {
