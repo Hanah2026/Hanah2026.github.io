@@ -617,6 +617,7 @@ function ensureStudentRecordPanel() {
   $("cancelStudentEdit")?.addEventListener("click", () => { $("recordEditForm").style.display = "none"; });
   $("saveStudentEdit")?.addEventListener("click", () => saveStudentEdit(window.currentRecordStudentId));
   $("printStudentRecord")?.addEventListener("click", printStudentRecord);
+  $("printStudentCard")?.addEventListener("click", printStudentProfileCard);
   $("addPaymentRecord")?.addEventListener("click", () => { $("paymentForm").style.display = "block"; });
   $("cancelPayment")?.addEventListener("click", () => { $("paymentForm").style.display = "none"; });
   $("savePayment")?.addEventListener("click", () => savePaymentRecord(window.currentRecordStudentId));
