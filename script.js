@@ -219,6 +219,7 @@ async function showStudentPortal(user) {
       <p class="portal-note">Your academy account is connected successfully. Additional attendance, promotion and payment features can be added to this portal.</p>
     </div>
   `);
+  await loadStudentPromotions(user.id);
 }
 
 
@@ -532,6 +533,69 @@ async function ensureStudentAttendancePanel(user, profile) {
   return panel;
 }
 
+
+
+function ensurePromotionPanel() {
+  let panel = $("promotionPanel");
+  if (panel) return panel;
+  const section = $("student-login");
+  const container = section.querySelector(".container");
+  panel = document.createElement("div");
+  panel.id = "promotionPanel";
+  panel.className = "admin-dashboard";
+  panel.innerHTML = `
+    <div class="admin-head"><div>
+      <p class="eyebrow">PROMOTION MANAGEMENT</p>
+      <h2>🥋 Promotion History</h2>
+      <p class="admin-subtitle">Record student belt promotions and review promotion history.</p>
+    </div><button id="promotionRefresh" class="btn outline" type="button">REFRESH</button></div>
+    <div class="admin-form-grid">
+      <label>Student<select id="promotionStudent"></select></label>
+      <label>Previous Belt<select id="previousBelt"><option>White Belt</option><option>Yellow Belt</option><option>Orange Belt</option><option>Green Belt</option><option>Blue Belt</option><option>Purple Belt</option><option>Brown Belt</option><option>Stripe Brown Belt</option><option>Red Belt</option><option>Stripe Red Belt</option></select></label>
+      <label>New Belt<select id="newBelt"><option>Yellow Belt</option><option>Orange Belt</option><option>Green Belt</option><option>Blue Belt</option><option>Purple Belt</option><option>Brown Belt</option><option>Stripe Brown Belt</option><option>Red Belt</option><option>Stripe Red Belt</option><option>1st Poom</option><option>1st Dan</option><option>2nd Dan</option><option>3rd Dan</option></select></label>
+      <label>Promotion Date<input id="promotionDate" type="date"></label>
+      <label>Examiner<input id="promotionExaminer" type="text" value="Master Reynaldo Tanjuakio Jr."></label>
+      <label>Remarks<input id="promotionRemarks" type="text" placeholder="Optional remarks"></label>
+    </div>
+    <button id="savePromotion" class="btn" type="button">SAVE PROMOTION</button>
+    <p id="promotionMessage" class="form-message"></p>
+    <div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Student</th><th>Previous Belt</th><th>New Belt</th><th>Date</th><th>Examiner</th><th>Remarks</th></tr></thead><tbody id="promotionRows"><tr><td colspan="6">Loading promotion records…</td></tr></tbody></table></div>`;
+  container.appendChild(panel);
+  $("promotionDate").value = new Date().toISOString().slice(0,10);
+  $("promotionRefresh").addEventListener("click", loadPromotionAdmin);
+  $("savePromotion").addEventListener("click", savePromotion);
+  return panel;
+}
+
+async function loadPromotionAdmin() {
+  ensurePromotionPanel();
+  const studentSelect=$("promotionStudent"), rows=$("promotionRows");
+  const {data:students,error:se}=await db.from("students").select("id,first_name,middle_name,last_name,current_belt,status").order("last_name",{ascending:true});
+  if(se){setMessage($("promotionMessage"),se.message,"error");return;}
+  studentSelect.innerHTML=(students||[]).map(s=>{const n=[s.first_name,s.middle_name,s.last_name].filter(Boolean).join(" ");return `<option value="${escapeHtml(s.id)}">${escapeHtml(n)} — ${escapeHtml(s.current_belt||"White Belt")}</option>`}).join("");
+  const {data:promotions,error}=await db.from("promotions").select("student_id,previous_belt,new_belt,promotion_date,examiner,remarks").order("promotion_date",{ascending:false});
+  if(error){rows.innerHTML=`<tr><td colspan="6">${escapeHtml(error.message)}</td></tr>`;setMessage($("promotionMessage"),error.message,"error");return;}
+  const names=Object.fromEntries((students||[]).map(s=>[s.id,[s.first_name,s.middle_name,s.last_name].filter(Boolean).join(" ")]));
+  rows.innerHTML=(promotions||[]).length?(promotions.map(p=>`<tr><td>${escapeHtml(names[p.student_id]||"Student")}</td><td>${escapeHtml(p.previous_belt||"—")}</td><td>${escapeHtml(p.new_belt||"—")}</td><td>${formatDate(p.promotion_date)}</td><td>${escapeHtml(p.examiner||"—")}</td><td>${escapeHtml(p.remarks||"—")}</td></tr>`).join("")):`<tr><td colspan="6">No promotion records yet.</td></tr>`;
+}
+
+async function savePromotion() {
+  const studentId=$("promotionStudent")?.value, previousBelt=$("previousBelt")?.value, newBelt=$("newBelt")?.value, promotionDate=$("promotionDate")?.value, examiner=$("promotionExaminer")?.value.trim(), remarks=$("promotionRemarks")?.value.trim(), msg=$("promotionMessage");
+  if(!studentId||!newBelt||!promotionDate){setMessage(msg,"Please complete the student, new belt, and promotion date.","error");return;}
+  setMessage(msg,"Saving promotion…");
+  const {error:pe}=await db.from("promotions").insert({student_id:studentId,previous_belt:previousBelt,new_belt:newBelt,promotion_date:promotionDate,examiner:examiner||"Master Reynaldo Tanjuakio Jr.",remarks:remarks||null});
+  if(pe){setMessage(msg,"Promotion failed: "+pe.message,"error");return;}
+  const {error:be}=await db.from("students").update({current_belt:newBelt}).eq("id",studentId);
+  if(be){setMessage(msg,"Promotion saved, but belt update failed: "+be.message,"error");return;}
+  setMessage(msg,`Promotion saved. Current belt: ${newBelt}`,"success"); $("promotionRemarks").value=""; await loadPromotionAdmin(); await loadAdminStudents();
+}
+
+async function loadStudentPromotions(userId) {
+  const area=$("portalAccountArea"); if(!area)return;
+  const {data,error}=await db.from("promotions").select("previous_belt,new_belt,promotion_date,examiner,remarks").eq("student_id",userId).order("promotion_date",{ascending:false});
+  const html=error?`<p class="form-message error">${escapeHtml(error.message)}</p>`:`<div class="welcome-card"><p class="eyebrow">🥋 PROMOTION HISTORY</p><h3>Your Belt Promotion History</h3><div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Previous Belt</th><th>New Belt</th><th>Date</th><th>Examiner</th><th>Remarks</th></tr></thead><tbody>${(data||[]).length?data.map(p=>`<tr><td>${escapeHtml(p.previous_belt||"—")}</td><td>${escapeHtml(p.new_belt||"—")}</td><td>${formatDate(p.promotion_date)}</td><td>${escapeHtml(p.examiner||"—")}</td><td>${escapeHtml(p.remarks||"—")}</td></tr>`).join(""):`<tr><td colspan="5">No promotion records yet.</td></tr>`}</tbody></table></div></div>`;
+  area.insertAdjacentHTML("beforeend",html);
+}
 
 async function showAdminPortal(user) {
   const form = $("loginForm");
