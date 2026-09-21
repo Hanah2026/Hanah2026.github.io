@@ -90,18 +90,9 @@ if (registerForm) {
     // Link a new sign-in account to a pending academy record so the
     // administrator can review and approve it from the dashboard.
     if (data.session && data.user) {
-      const { error: profileError } = await db
-        .from("students")
-        .insert({
-          id: data.user.id,
-          first_name: firstName,
-          last_name: lastName,
-          current_belt: "White Belt",
-          status: "Pending",
-          date_joined: new Date().toISOString().slice(0, 10)
-        });
-
-      if (profileError) {
+      try {
+        await createPendingStudentProfile(data.user, { firstName, lastName });
+      } catch (profileError) {
         setMessage(msg, `Account created, but the academy profile could not be added: ${profileError.message}`, "error");
         return;
       }
@@ -200,6 +191,22 @@ function ensureSignOutButton() {
   return btn;
 }
 
+async function createPendingStudentProfile(user, { firstName = "", lastName = "" } = {}) {
+  const { error } = await db
+    .from("students")
+    .insert({
+      id: user.id,
+      first_name: firstName,
+      last_name: lastName,
+      current_belt: "White Belt",
+      status: "Pending",
+      date_joined: new Date().toISOString().slice(0, 10)
+    });
+
+  // A profile may already have been created by an earlier registration.
+  if (error && error.code !== "23505") throw error;
+}
+
 async function loadStudentProfile(user) {
   const { data, error } = await db
     .from("students")
@@ -213,7 +220,18 @@ async function loadStudentProfile(user) {
 async function showStudentPortal(user) {
   const form = $("loginForm");
   const info = document.querySelector(".portal-info");
-  const profile = await loadStudentProfile(user);
+  let profile = await loadStudentProfile(user);
+  if (!profile) {
+    try {
+      await createPendingStudentProfile(user, {
+        firstName: user.user_metadata?.first_name || "",
+        lastName: user.user_metadata?.last_name || ""
+      });
+      profile = await loadStudentProfile(user);
+    } catch (err) {
+      console.error("Unable to create academy profile:", err);
+    }
+  }
   const area = ensurePortalMessageArea();
   ensureSignOutButton();
 
