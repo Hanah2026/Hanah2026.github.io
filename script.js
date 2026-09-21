@@ -87,6 +87,26 @@ if (registerForm) {
       return;
     }
 
+    // Link a new sign-in account to a pending academy record so the
+    // administrator can review and approve it from the dashboard.
+    if (data.session && data.user) {
+      const { error: profileError } = await db
+        .from("students")
+        .insert({
+          id: data.user.id,
+          first_name: firstName,
+          last_name: lastName,
+          current_belt: "White Belt",
+          status: "Pending",
+          date_joined: new Date().toISOString().slice(0, 10)
+        });
+
+      if (profileError) {
+        setMessage(msg, `Account created, but the academy profile could not be added: ${profileError.message}`, "error");
+        return;
+      }
+    }
+
     if (data.session) {
       setMessage(msg, "Account created successfully. You can now sign in.", "success");
     } else {
@@ -422,3 +442,4 @@ db.auth.getSession().then(async ({ data }) => {
     }
   }
 });
+
