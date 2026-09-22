@@ -122,6 +122,20 @@
         <p id="loginMessage" class="form-message"></p>
       </form>
     </div>
+
+    <div id="galleryAdminPanel" class="welcome-card" style="display:none;margin-top:20px;">
+      <p class="eyebrow">GALLERY MANAGEMENT</p>
+      <h3>📷 Upload Gallery Highlight</h3>
+      <div class="admin-form-grid">
+        <label>Title<input id="galleryTitle" placeholder="Event or activity title"></label>
+        <label>Media Type<select id="galleryMediaType"><option value="image">Photo</option><option value="video">Video</option></select></label>
+        <label style="grid-column:1/-1;">Description<input id="galleryDescription" placeholder="Optional description"></label>
+        <label style="grid-column:1/-1;">Choose Photo / Video<input id="galleryFile" type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime"></label>
+      </div>
+      <div class="admin-actions"><button id="uploadGalleryMedia" class="btn primary" type="button">UPLOAD TO GALLERY</button></div>
+      <p id="galleryAdminMessage" class="form-message"></p>
+      <div id="galleryAdminList" style="margin-top:15px;"></div>
+    </div>
   </div>
 </section>
 
@@ -166,5 +180,33 @@
 </form></div></div><footer><div class="container footer-wrap"><div><strong>HANAH NEHT TAEKWONDO ACADEMY</strong><small>KUKKIWON DOJANG</small></div><span>© 2026 Hanah Neht Taekwondo Academy</span></div></footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="script.js"></script>
+<script>
+(function () {
+  const galleryClient = window.supabase.createClient(
+    "https://ztlnszexrwximmmomdui.supabase.co",
+    "sb_publishable_aAK8s-mKAmV6JZdTyN_PIg_iifwClYn"
+  );
+  const adminEmail = "cattleya16herculis14@gmail.com";
+  async function updateGalleryAdminVisibility(session) {
+    const panel = document.getElementById("galleryAdminPanel");
+    if (!panel) return;
+    const isAdmin = !!session?.user?.email &&
+      session.user.email.toLowerCase() === adminEmail.toLowerCase();
+    panel.style.display = isAdmin ? "block" : "none";
+    if (isAdmin && typeof window.loadGalleryAdminList === "function") {
+      await window.loadGalleryAdminList();
+    }
+    if (isAdmin && !document.getElementById("uploadGalleryMedia")?.dataset.bound &&
+        typeof window.uploadGalleryMedia === "function") {
+      document.getElementById("uploadGalleryMedia").addEventListener("click", window.uploadGalleryMedia);
+      document.getElementById("uploadGalleryMedia").dataset.bound = "true";
+    }
+  }
+  galleryClient.auth.getSession().then(({ data }) => updateGalleryAdminVisibility(data.session));
+  galleryClient.auth.onAuthStateChange((_event, session) => {
+    setTimeout(() => updateGalleryAdminVisibility(session), 0);
+  });
+})();
+</script>
 </body>
 </html>
