@@ -930,6 +930,20 @@ function ensureStudentRecordPanel() {
         <label>Address<input id="editAddress"></label>
         <label>Emergency Contact<input id="editEmergencyName"></label>
         <label>Emergency Phone<input id="editEmergencyPhone"></label>
+        <label>Current Belt<select id="editCurrentBelt">
+          <option>White Belt</option>
+          <option>Yellow Belt</option>
+          <option>Orange Belt</option>
+          <option>Green Belt</option>
+          <option>Blue Belt</option>
+          <option>Purple Belt</option>
+          <option>Brown Belt</option>
+          <option>Stripe Brown Belt</option>
+          <option>Red Belt</option>
+          <option>Stripe Red Belt</option>
+          <option>Poom</option>
+          <option>Dan</option>
+        </select></label>
         <label>Status<select id="editStatus"><option>Active</option><option>Pending</option></select></label>
       </div>
       <div class="admin-actions"><button id="saveStudentEdit" class="btn" type="button">SAVE CHANGES</button><button id="cancelStudentEdit" class="btn outline" type="button">CANCEL</button></div>
@@ -1070,6 +1084,7 @@ async function showStudentRecord(studentId) {
   $("editAddress").value = student.address || "";
   $("editEmergencyName").value = student.emergency_contact_name || "";
   $("editEmergencyPhone").value = student.emergency_contact_phone || "";
+  $("editCurrentBelt").value = student.current_belt || "White Belt";
   $("editStatus").value = student.status || "Active";
   $("recordEditForm").style.display = "none";
   $("paymentForm").style.display = "none";
@@ -1194,7 +1209,9 @@ async function saveStudentEdit(studentId) {
     last_name: $("editLastName").value.trim(), birth_date: $("editBirthDate").value || null,
     gender: $("editGender").value || null, phone: $("editPhone").value.trim() || null,
     address: $("editAddress").value.trim() || null, emergency_contact_name: $("editEmergencyName").value.trim() || null,
-    emergency_contact_phone: $("editEmergencyPhone").value.trim() || null, status: $("editStatus").value
+    emergency_contact_phone: $("editEmergencyPhone").value.trim() || null,
+    current_belt: $("editCurrentBelt").value,
+    status: $("editStatus").value
   };
   if (!payload.first_name || !payload.last_name) { setMessage(msg, "First name and last name are required.", "error"); return; }
   const { error } = await db.from("students").update(payload).eq("id", studentId);
