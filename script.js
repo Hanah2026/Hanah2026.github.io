@@ -133,6 +133,137 @@ function ensurePortalMessageArea() {
   return area;
 }
 
+async function loadPublicGallery() {
+  const container = $("publicGalleryItems");
+  if (!container) return;
+  const { data, error } = await db.from("gallery_highlights")
+    .select("id,title,description,media_type,file_path,created_at")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.warn("Gallery could not be loaded:", error.message);
+    return;
+  }
+  if (!data || !data.length) return;
+
+  container.innerHTML = data.map(item => {
+    const url = db.storage.from("gallery-media").getPublicUrl(item.file_path).data.publicUrl;
+    const media = item.media_type === "video"
+      ? `<video src="${escapeHtml(url)}" controls preload="metadata" style="width:100%;height:220px;object-fit:cover;border-radius:10px;"></video>`
+      : `<img src="${escapeHtml(url)}" alt="${escapeHtml(item.title)}" style="width:100%;height:220px;object-fit:cover;border-radius:10px;">`;
+    return `<div class="gallery-item" style="overflow:hidden;">
+      ${media}
+      <strong style="display:block;margin-top:10px;">${escapeHtml(item.title)}</strong>
+      ${item.description ? `<small>${escapeHtml(item.description)}</small>` : ""}
+    </div>`;
+  }).join("");
+}
+
+async function ensureGalleryAdminPanel() {
+  const panel = $("galleryAdminPanel");
+  if (panel) return panel;
+  const section = $("student-login");
+  const container = section?.querySelector(".container");
+  if (!container) return null;
+
+  const wrap = document.createElement("div");
+  wrap.id = "galleryAdminPanel";
+  wrap.className = "welcome-card";
+  wrap.style.marginTop = "20px";
+  wrap.innerHTML = `
+    <p class="eyebrow">GALLERY MANAGEMENT</p>
+    <h3>📷 Upload Gallery Highlight</h3>
+    <div class="admin-form-grid">
+      <label>Title<input id="galleryTitle" placeholder="Event or activity title"></label>
+      <label>Media Type<select id="galleryMediaType"><option value="image">Photo</option><option value="video">Video</option></select></label>
+      <label style="grid-column:1/-1;">Description<input id="galleryDescription" placeholder="Optional description"></label>
+      <label style="grid-column:1/-1;">Choose Photo / Video<input id="galleryFile" type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime"></label>
+    </div>
+    <div class="admin-actions"><button id="uploadGalleryMedia" class="btn primary" type="button">UPLOAD TO GALLERY</button></div>
+    <p id="galleryAdminMessage" class="form-message"></p>
+    <div id="galleryAdminList" style="margin-top:15px;"></div>
+  `;
+  container.appendChild(wrap);
+
+  $("uploadGalleryMedia").addEventListener("click", uploadGalleryMedia);
+  await loadGalleryAdminList();
+  return wrap;
+}
+
+async function loadGalleryAdminList() {
+  const box = $("galleryAdminList");
+  if (!box) return;
+  const { data, error } = await db.from("gallery_highlights")
+    .select("id,title,description,media_type,file_path,created_at")
+    .order("created_at", { ascending: false });
+  if (error) { box.innerHTML = `<p class="form-message error">${escapeHtml(error.message)}</p>`; return; }
+  box.innerHTML = (data || []).map(item => `
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;border-top:1px solid #ddd;padding:10px 0;">
+      <span><strong>${escapeHtml(item.title)}</strong> — ${item.media_type === "video" ? "Video" : "Photo"}</span>
+      <button class="danger-btn gallery-delete-btn" data-id="${escapeHtml(item.id)}" type="button">DELETE</button>
+    </div>`).join("") || "<p>No gallery uploads yet.</p>";
+  box.onclick = async e => {
+    const b = e.target.closest(".gallery-delete-btn");
+    if (!b) return;
+    await deleteGalleryItem(b.dataset.id);
+  };
+}
+
+async function uploadGalleryMedia() {
+  const file = $("galleryFile")?.files?.[0];
+  const title = $("galleryTitle")?.value.trim();
+  const description = $("galleryDescription")?.value.trim() || null;
+  const mediaType = $("galleryMediaType")?.value;
+  const msg = $("galleryAdminMessage");
+  if (!file || !title) { setMessage(msg, "Please enter a title and choose a photo or video.", "error"); return; }
+
+  const isVideo = file.type.startsWith("video/");
+  const isImage = file.type.startsWith("image/");
+  if ((mediaType === "video" && !isVideo) || (mediaType === "image" && !isImage)) {
+    setMessage(msg, "The selected file does not match the chosen media type.", "error"); return;
+  }
+  const maxBytes = isVideo ? 50 * 1024 * 1024 : 5 * 1024 * 1024;
+  if (file.size > maxBytes) {
+    setMessage(msg, `${isVideo ? "Video" : "Photo"} is too large. Maximum is ${isVideo ? "50 MB" : "5 MB"}.`, "error"); return;
+  }
+
+  setMessage(msg, "Uploading… Please wait.");
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const path = `highlights/${Date.now()}_${safeName}`;
+  const { error: uploadError } = await db.storage.from("gallery-media").upload(path, file, {
+    upsert: false, contentType: file.type, cacheControl: "3600"
+  });
+  if (uploadError) { setMessage(msg, "Upload failed: " + uploadError.message, "error"); return; }
+
+  const { error: dbError } = await db.from("gallery_highlights").insert({
+    title, description, media_type: mediaType, file_path: path
+  });
+  if (dbError) {
+    await db.storage.from("gallery-media").remove([path]);
+    setMessage(msg, "Gallery record failed: " + dbError.message, "error"); return;
+  }
+
+  $("galleryTitle").value = "";
+  $("galleryDescription").value = "";
+  $("galleryFile").value = "";
+  setMessage(msg, "Gallery highlight uploaded successfully.", "success");
+  await loadGalleryAdminList();
+  await loadPublicGallery();
+}
+
+async function deleteGalleryItem(id) {
+  if (!id || !confirm("Delete this gallery highlight? This cannot be undone.")) return;
+  const { data, error } = await db.from("gallery_highlights").select("file_path").eq("id", id).maybeSingle();
+  if (error || !data) { setMessage($("galleryAdminMessage"), "Unable to find gallery item.", "error"); return; }
+  const { error: storageError } = await db.storage.from("gallery-media").remove([data.file_path]);
+  if (storageError) { setMessage($("galleryAdminMessage"), "File delete failed: " + storageError.message, "error"); return; }
+  const { error: deleteError } = await db.from("gallery_highlights").delete().eq("id", id);
+  if (deleteError) { setMessage($("galleryAdminMessage"), "Record delete failed: " + deleteError.message, "error"); return; }
+  setMessage($("galleryAdminMessage"), "Gallery highlight deleted.", "success");
+  await loadGalleryAdminList();
+  await loadPublicGallery();
+}
+
 function ensureAdminPanel() {
   let panel = $("adminDashboard");
   if (panel) return panel;
@@ -1232,6 +1363,7 @@ async function deletePromotionRecord(recordId, studentId) {
   setMessage($("recordMessage"), "Promotion record deleted.", "success");
   await showStudentRecord(studentId);
   await loadPromotionAdmin();
+  await ensureGalleryAdminPanel();
 }
 
 async function deleteAttendanceRecord(recordId, studentId) {
@@ -1499,6 +1631,7 @@ async function showPortalForUser(user) {
 }
 
 // Restore an existing session after refresh.
+loadPublicGallery();
 db.auth.getSession().then(async ({ data }) => {
   if (data.session?.user) {
     try {
