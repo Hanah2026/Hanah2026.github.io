@@ -942,7 +942,11 @@ function ensureStudentRecordPanel() {
           <option>Red Belt</option>
           <option>Stripe Red Belt</option>
           <option>Poom</option>
-          <option>Dan</option>
+          <option>1st Dan</option>
+          <option>2nd Dan</option>
+          <option>3rd Dan</option>
+          <option>4th Dan</option>
+          <option>5th Dan</option>
         </select></label>
         <label>Status<select id="editStatus"><option>Active</option><option>Pending</option></select></label>
       </div>
