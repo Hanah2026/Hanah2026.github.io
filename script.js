@@ -281,11 +281,13 @@ async function showStudentPortal(user) {
         <h3>Update Your Personal Information</h3>
         <p class="portal-note">You can update your personal and emergency-contact information. Student ID, belt, status, and date joined are controlled by the academy.</p>
         <div class="admin-form-grid">
-          <div style="grid-column:1/-1;padding:14px;border:1px solid #ddd;border-radius:12px;background:#fafafa;">
+          <div style="grid-column:1/-1;padding:12px;border:1px solid #ddd;border-radius:10px;background:#fafafa;">
             <strong>📷 PROFILE PICTURE</strong>
-            <p class="portal-note" style="margin:6px 0 10px;">Upload a clear recent photo. JPG, PNG, or WebP, maximum 5 MB.</p>
-            <input id="studentProfilePhoto" type="file" accept="image/jpeg,image/png,image/webp">
-            <p id="studentProfilePhotoStatus" class="portal-note" style="margin:6px 0 0;"></p>
+            <p class="portal-note" style="margin:5px 0 8px;">Upload a clear recent photo. JPG, PNG, or WebP, maximum 5 MB.</p>
+            <label for="studentProfilePhoto" style="display:inline-flex;align-items:center;justify-content:center;padding:9px 16px;border-radius:7px;background:#111;color:#fff;font-weight:700;cursor:pointer;font-size:13px;">📷 CHOOSE PHOTO</label>
+            <input id="studentProfilePhoto" type="file" accept="image/jpeg,image/png,image/webp" style="display:none;">
+            <span id="studentProfilePhotoName" style="display:block;margin-top:7px;font-size:12px;color:#555;">No photo selected</span>
+            <p id="studentProfilePhotoStatus" class="portal-note" style="margin:5px 0 0;"></p>
           </div>
           <label>Student ID<input type="text" value="${escapeHtml(profile.student_id || "Pending assignment")}" readonly></label>
           <label>Email<input type="email" value="${escapeHtml(user.email || "")}" readonly></label>
@@ -419,6 +421,11 @@ function openStudentProfileEditor(profile) {
   $("editEmergencyPhone").value = profile.emergency_contact_phone || "";
   const photoStatus = $("studentProfilePhotoStatus");
   if (photoStatus) photoStatus.textContent = profile.photo_path ? "A profile picture is already saved. Choose a new file to replace it." : "No profile picture uploaded yet.";
+  const photoInput = $("studentProfilePhoto");
+  photoInput?.addEventListener("change", () => {
+    const name = $("studentProfilePhotoName");
+    if (name) name.textContent = photoInput.files?.[0]?.name || "No photo selected";
+  });
   setMessage($("studentEditMessage"), "", "");
   panel.scrollIntoView({ behavior: "smooth", block: "start" });
 }
