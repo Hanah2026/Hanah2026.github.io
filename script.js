@@ -174,6 +174,53 @@ function ensureAdminPanel() {
   return panel;
 }
 
+function ensureStudentDetailPanel() {
+  let panel = $("studentDetailPanel");
+  if (panel) return panel;
+  const dashboard = $("adminDashboard");
+  if (!dashboard) return null;
+  panel = document.createElement("div");
+  panel.id = "studentDetailPanel";
+  panel.className = "welcome-card";
+  panel.style.display = "none";
+  dashboard.appendChild(panel);
+  return panel;
+}
+
+async function viewStudentProfile(studentId) {
+  const panel = ensureStudentDetailPanel();
+  if (!panel || !studentId) return;
+  panel.style.display = "block";
+  panel.innerHTML = `<p>Loading student account…</p>`;
+
+  const { data: student, error } = await db
+    .from("students")
+    .select("id, student_id, first_name, middle_name, last_name, current_belt, status, date_joined, created_at")
+    .eq("id", studentId)
+    .maybeSingle();
+
+  if (error || !student) {
+    panel.innerHTML = `<p class="form-message error">${escapeHtml(error?.message || "Student account not found.")}</p>`;
+    return;
+  }
+
+  const name = [student.first_name, student.middle_name, student.last_name].filter(Boolean).join(" ") || "Unnamed Student";
+  panel.innerHTML = `
+    <p class="eyebrow">STUDENT ACCOUNT</p>
+    <h3>${escapeHtml(name)}</h3>
+    <div class="welcome-details">
+      <span><b>Student ID</b>${escapeHtml(student.student_id || "Pending assignment")}</span>
+      <span><b>Status</b>${escapeHtml(student.status || "Pending")}</span>
+      <span><b>Belt</b>${escapeHtml(student.current_belt || "White Belt")}</span>
+      <span><b>Date Joined</b>${formatDate(student.date_joined || student.created_at)}</span>
+    </div>
+    <button class="btn outline" id="closeStudentDetail" type="button">CLOSE</button>
+  `;
+  $("closeStudentDetail")?.addEventListener("click", () => {
+    panel.style.display = "none";
+  });
+}
+
 function ensureSignOutButton() {
   let btn = $("portalSignOut");
   if (btn) return btn;
@@ -352,9 +399,10 @@ async function loadAdminStudents() {
   rows.innerHTML = students.map((s) => {
     const name = [s.first_name, s.middle_name, s.last_name].filter(Boolean).join(" ") || "Unnamed Student";
     const status = s.status || "Pending";
+    const view = `<button class="btn outline view-student-btn" data-id="${escapeHtml(s.id)}" type="button">VIEW</button>`;
     const action = status.toLowerCase() === "active"
-      ? `<span class="status-active">ACTIVE</span>`
-      : `<button class="approve-btn" data-id="${escapeHtml(s.id)}" type="button">APPROVE</button>`;
+      ? `<span class="status-active">ACTIVE</span> ${view}`
+      : `<button class="approve-btn" data-id="${escapeHtml(s.id)}" type="button">APPROVE</button> ${view}`;
     return `<tr>
       <td><strong>${escapeHtml(name)}</strong><small>${escapeHtml(s.student_id || "")}</small></td>
       <td>Student account</td>
@@ -368,6 +416,13 @@ async function loadAdminStudents() {
   // Use event delegation so the approval button continues to work reliably
   // even when the table is rebuilt after refreshes.
   rows.onclick = async (event) => {
+    const viewBtn = event.target.closest(".view-student-btn");
+    if (viewBtn) {
+      event.preventDefault();
+      event.stopPropagation();
+      await viewStudentProfile(viewBtn.dataset.id);
+      return;
+    }
     const btn = event.target.closest(".approve-btn");
     if (!btn) return;
     event.preventDefault();
