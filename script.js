@@ -914,6 +914,7 @@ function ensureStudentRecordPanel() {
         <button id="printStudentRecord" class="btn" type="button">PRINT RECORD</button>
         <button id="printStudentCard" class="btn" type="button">PRINT PROFILE CARD</button>
         <button id="editStudentRecord" class="btn outline" type="button">EDIT STUDENT</button>
+        <button id="deleteStudentRecord" class="danger-btn" type="button">🗑️ DELETE STUDENT</button>
         <button id="closeStudentRecord" class="btn outline" type="button">CLOSE</button>
       </div>
     </div>
@@ -982,6 +983,7 @@ function ensureStudentRecordPanel() {
   $("editStudentRecord")?.addEventListener("click", () => { $("recordEditForm").style.display = "block"; });
   $("cancelStudentEdit")?.addEventListener("click", () => { $("recordEditForm").style.display = "none"; });
   $("saveStudentEdit")?.addEventListener("click", () => saveStudentEdit(window.currentRecordStudentId));
+  $("deleteStudentRecord")?.addEventListener("click", () => deleteStudentRecord(window.currentRecordStudentId));
   $("printStudentRecord")?.addEventListener("click", printStudentRecord);
   $("printStudentCard")?.addEventListener("click", printStudentProfileCard);
   $("uploadStudentPhoto")?.addEventListener("click", async () => {
@@ -1155,6 +1157,34 @@ async function showStudentRecord(studentId) {
   }
 }
 
+
+async function deleteStudentRecord(studentId) {
+  if (!studentId) return;
+  const student = window.currentRecordData;
+  const name = [student?.first_name, student?.middle_name, student?.last_name].filter(Boolean).join(" ") || "this student";
+  const sid = student?.student_id || "No Student ID";
+  const confirmed = confirm(
+    `PERMANENT DELETE\\n\\nDelete ${name} (${sid})?\\n\\nThis will remove the student's academy profile and related attendance, promotion, payment, and certificate records. The student's login account will also be removed.\\n\\nThis action cannot be undone.\\n\\nClick OK only if this is the duplicate account.`
+  );
+  if (!confirmed) return;
+
+  const msg = $("recordMessage");
+  setMessage(msg, "Deleting student account… Please wait.");
+
+  const { data, error } = await db.rpc("admin_delete_student", { target_student_id: studentId });
+  if (error) {
+    console.error("Delete student error:", error);
+    setMessage(msg, "Student deletion failed: " + error.message, "error");
+    return;
+  }
+
+  setMessage(msg, "Duplicate student account deleted successfully.", "success");
+  window.currentRecordStudentId = null;
+  window.currentRecordData = null;
+  const panel = $("studentRecordPanel");
+  if (panel) panel.style.display = "none";
+  await loadAdminStudents();
+}
 
 async function saveStudentEdit(studentId) {
   if (!studentId) return;
