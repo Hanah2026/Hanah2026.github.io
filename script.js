@@ -281,15 +281,23 @@ async function showStudentPortal(user) {
         <h3>Update Your Personal Information</h3>
         <p class="portal-note">You can update your personal and emergency-contact information. Student ID, belt, status, and date joined are controlled by the academy.</p>
         <div class="admin-form-grid">
+          <div style="grid-column:1/-1;padding:14px;border:1px solid #ddd;border-radius:12px;background:#fafafa;">
+            <strong>📷 PROFILE PICTURE</strong>
+            <p class="portal-note" style="margin:6px 0 10px;">Upload a clear recent photo. JPG, PNG, or WebP, maximum 5 MB.</p>
+            <input id="studentProfilePhoto" type="file" accept="image/jpeg,image/png,image/webp">
+            <p id="studentProfilePhotoStatus" class="portal-note" style="margin:6px 0 0;"></p>
+          </div>
+          <label>Student ID<input type="text" value="${escapeHtml(profile.student_id || "Pending assignment")}" readonly></label>
+          <label>Email<input type="email" value="${escapeHtml(user.email || "")}" readonly></label>
           <label>First Name<input id="editFirstName" type="text" autocomplete="given-name"></label>
           <label>Middle Name<input id="editMiddleName" type="text" autocomplete="additional-name"></label>
           <label>Last Name<input id="editLastName" type="text" autocomplete="family-name"></label>
           <label>Birth Date<input id="editBirthDate" type="date"></label>
           <label>Gender<select id="editGender"><option value="">— Select —</option><option value="Male">Male</option><option value="Female">Female</option><option value="Other">Other</option></select></label>
           <label>Phone<input id="editPhone" type="tel" autocomplete="tel"></label>
-          <label>Address<textarea id="editAddress" rows="3" autocomplete="street-address"></textarea></label>
-          <label>Emergency Contact<input id="editEmergencyName" type="text"></label>
-          <label>Emergency Phone<input id="editEmergencyPhone" type="tel"></label>
+          <label style="grid-column:1/-1;">Complete Address<textarea id="editAddress" rows="3" autocomplete="street-address" placeholder="House/Unit, Street, Barangay, City/Municipality, Province"></textarea></label>
+          <label>Emergency Contact Name<input id="editEmergencyName" type="text" autocomplete="name"></label>
+          <label>Emergency Contact Phone<input id="editEmergencyPhone" type="tel" autocomplete="tel"></label>
         </div>
         <div class="admin-actions">
           <button id="saveStudentProfile" class="btn" type="button">💾 SAVE CHANGES</button>
@@ -409,6 +417,8 @@ function openStudentProfileEditor(profile) {
   $("editAddress").value = profile.address || "";
   $("editEmergencyName").value = profile.emergency_contact_name || "";
   $("editEmergencyPhone").value = profile.emergency_contact_phone || "";
+  const photoStatus = $("studentProfilePhotoStatus");
+  if (photoStatus) photoStatus.textContent = profile.photo_path ? "A profile picture is already saved. Choose a new file to replace it." : "No profile picture uploaded yet.";
   setMessage($("studentEditMessage"), "", "");
   panel.scrollIntoView({ behavior: "smooth", block: "start" });
 }
@@ -436,6 +446,19 @@ async function saveStudentProfile(userId) {
     emergency_contact_phone: $("editEmergencyPhone")?.value.trim() || null
   };
 
+  const photoInput = $("studentProfilePhoto");
+  const photoFile = photoInput?.files?.[0] || null;
+  if (photoFile) {
+    if (!["image/jpeg", "image/png", "image/webp"].includes(photoFile.type)) {
+      setMessage(msg, "Please upload a JPG, PNG, or WebP photo.", "error");
+      return;
+    }
+    if (photoFile.size > 5 * 1024 * 1024) {
+      setMessage(msg, "Photo must be 5 MB or smaller.", "error");
+      return;
+    }
+  }
+
   const { data, error } = await db
     .from("students")
     .update(updates)
@@ -452,7 +475,35 @@ async function saveStudentProfile(userId) {
     return;
   }
 
-  setMessage(msg, "Profile updated successfully.", "success");
+  if (photoFile) {
+    try {
+      const ext = (photoFile.name.split(".").pop() || "jpg").toLowerCase();
+      const path = `students/${userId}/photo.${ext}`;
+      const status = $("studentProfilePhotoStatus");
+      if (status) status.textContent = "Uploading profile picture…";
+      const { error: removeError } = await db.storage.from("student-photos").remove([path]);
+      if (removeError) console.warn("Old profile photo removal:", removeError.message);
+      const { error: uploadError } = await db.storage.from("student-photos").upload(path, photoFile, {
+        upsert: false,
+        contentType: photoFile.type,
+        cacheControl: "3600"
+      });
+      if (uploadError) {
+        setMessage(msg, "Profile saved, but photo upload failed: " + uploadError.message, "error");
+        return;
+      }
+      const { error: photoRecordError } = await db.from("students").update({ photo_path: path }).eq("id", userId);
+      if (photoRecordError) {
+        setMessage(msg, "Profile saved, but photo record update failed: " + photoRecordError.message, "error");
+        return;
+      }
+    } catch (photoError) {
+      setMessage(msg, "Profile saved, but photo upload failed: " + (photoError?.message || "Unknown error"), "error");
+      return;
+    }
+  }
+
+  setMessage(msg, photoFile ? "Profile and picture updated successfully." : "Profile updated successfully.", "success");
   const panel = $("studentEditPanel");
   if (panel) panel.style.display = "none";
   setTimeout(() => window.location.reload(), 500);
