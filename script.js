@@ -134,8 +134,10 @@ function ensurePortalMessageArea() {
 }
 
 async function loadPublicGallery() {
-  const container = $("publicGalleryItems");
-  if (!container) return;
+  const photosContainer = $("publicGalleryPhotos");
+  const videosContainer = $("publicGalleryVideos");
+  if (!photosContainer && !videosContainer) return;
+
   const { data, error } = await db.from("gallery_highlights")
     .select("id,title,description,media_type,file_path,created_at")
     .order("created_at", { ascending: false });
@@ -144,19 +146,35 @@ async function loadPublicGallery() {
     console.warn("Gallery could not be loaded:", error.message);
     return;
   }
-  if (!data || !data.length) return;
 
-  container.innerHTML = data.map(item => {
-    const url = db.storage.from("gallery-media").getPublicUrl(item.file_path).data.publicUrl;
-    const media = item.media_type === "video"
-      ? `<video src="${escapeHtml(url)}" controls preload="metadata" style="width:100%;height:220px;object-fit:cover;border-radius:10px;"></video>`
-      : `<img src="${escapeHtml(url)}" alt="${escapeHtml(item.title)}" style="width:100%;height:220px;object-fit:cover;border-radius:10px;">`;
-    return `<div class="gallery-item" style="overflow:hidden;">
-      ${media}
-      <strong style="display:block;margin-top:10px;">${escapeHtml(item.title)}</strong>
-      ${item.description ? `<small>${escapeHtml(item.description)}</small>` : ""}
-    </div>`;
-  }).join("");
+  const photos = (data || []).filter(item => item.media_type === "image");
+  const videos = (data || []).filter(item => item.media_type === "video");
+
+  if (photosContainer) {
+    photosContainer.innerHTML = photos.length
+      ? photos.map(item => {
+          const url = db.storage.from("gallery-media").getPublicUrl(item.file_path).data.publicUrl;
+          return `<div class="gallery-item" style="overflow:hidden;">
+            <img src="${escapeHtml(url)}" alt="${escapeHtml(item.title)}" style="width:100%;height:220px;object-fit:cover;border-radius:10px;">
+            <strong style="display:block;margin-top:10px;">${escapeHtml(item.title)}</strong>
+            ${item.description ? `<small>${escapeHtml(item.description)}</small>` : ""}
+          </div>`;
+        }).join("")
+      : `<div><span style="font-size:32px;">📷</span><small>No photos uploaded yet</small></div>`;
+  }
+
+  if (videosContainer) {
+    videosContainer.innerHTML = videos.length
+      ? videos.map(item => {
+          const url = db.storage.from("gallery-media").getPublicUrl(item.file_path).data.publicUrl;
+          return `<div class="gallery-item" style="overflow:hidden;">
+            <video src="${escapeHtml(url)}" controls preload="metadata" style="width:100%;height:220px;object-fit:cover;border-radius:10px;"></video>
+            <strong style="display:block;margin-top:10px;">${escapeHtml(item.title)}</strong>
+            ${item.description ? `<small>${escapeHtml(item.description)}</small>` : ""}
+          </div>`;
+        }).join("")
+      : `<div><span style="font-size:32px;">🎥</span><small>No videos uploaded yet</small></div>`;
+  }
 }
 
 async function ensureGalleryAdminPanel() {
