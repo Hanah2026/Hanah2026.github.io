@@ -180,15 +180,7 @@ async function loadPublicGallery() {
 async function ensureGalleryAdminPanel() {
   const panel = $("galleryAdminPanel");
   if (!panel) return null;
-
   panel.style.display = "block";
-
-  const uploadButton = $("uploadGalleryMedia");
-  if (uploadButton && !uploadButton.dataset.bound) {
-    uploadButton.addEventListener("click", uploadGalleryMedia);
-    uploadButton.dataset.bound = "true";
-  }
-
   await loadGalleryAdminList();
   return panel;
 }
@@ -1649,6 +1641,21 @@ async function showPortalForUser(user) {
 
   document.getElementById("student-login")?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
+
+// Gallery upload button - delegated handler so it keeps working after dynamic rendering.
+document.addEventListener("click", async (event) => {
+  const button = event.target.closest("#uploadGalleryMedia");
+  if (!button || button.dataset.busy === "true") return;
+  button.dataset.busy = "true";
+  try {
+    await uploadGalleryMedia();
+  } catch (err) {
+    console.error("Gallery upload error:", err);
+    setMessage($("galleryAdminMessage"), "Upload error: " + (err?.message || String(err)), "error");
+  } finally {
+    button.dataset.busy = "false";
+  }
+});
 
 // Restore an existing session after refresh.
 loadPublicGallery();
