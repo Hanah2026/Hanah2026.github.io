@@ -206,14 +206,7 @@ async function loadGalleryAdminList() {
 
 async function uploadGalleryMedia() {
   const input = $("galleryFile");
-  const selectedFiles = Array.from(input?.files || []);
-  const seenFiles = new Set();
-  const files = selectedFiles.filter(file => {
-    const key = [file.name, file.size, file.lastModified, file.type].join("|");
-    if (seenFiles.has(key)) return false;
-    seenFiles.add(key);
-    return true;
-  });
+  const files = Array.from(input?.files || []);
   const title = $("galleryTitle")?.value.trim();
   const description = $("galleryDescription")?.value.trim() || null;
   const mediaType = $("galleryMediaType")?.value;
@@ -223,15 +216,12 @@ async function uploadGalleryMedia() {
     setMessage(msg, "Enter a title and choose one or more files.", "error");
     return;
   }
-  if (files.length < selectedFiles.length) {
-    setMessage(msg, "Duplicate selected files were removed. Uploading unique files only…");
-  }
 
   for (const file of files) {
     const ok = mediaType === "image" ? file.type.startsWith("image/") : file.type.startsWith("video/");
     const limit = mediaType === "image" ? 5 * 1024 * 1024 : 50 * 1024 * 1024;
     if (!ok) {
-      setMessage(msg, "Please select only the chosen media type.", "error");
+      setMessage(msg, "Please select only " + (mediaType === "image" ? "photos." : "videos."), "error");
       return;
     }
     if (file.size > limit) {
@@ -240,9 +230,11 @@ async function uploadGalleryMedia() {
     }
   }
 
+  let uploaded = 0;
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
     setMessage(msg, "Uploading " + (i + 1) + " of " + files.length + "…");
+
     const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
     const path = "highlights/" + Date.now() + "_" + i + "_" + safeName;
 
@@ -251,23 +243,30 @@ async function uploadGalleryMedia() {
       contentType: file.type,
       cacheControl: "3600"
     });
+
     if (uploadError) {
       setMessage(msg, "Upload failed: " + uploadError.message, "error");
       return;
     }
 
     const { error: dbError } = await db.from("gallery_highlights").insert({
-      title, description, media_type: mediaType, file_path: path
+      title: title + (files.length > 1 ? " (" + (i + 1) + ")" : ""),
+      description,
+      media_type: mediaType,
+      file_path: path
     });
+
     if (dbError) {
       await db.storage.from("gallery-media").remove([path]);
       setMessage(msg, "Gallery record failed: " + dbError.message, "error");
       return;
     }
+
+    uploaded++;
   }
 
   input.value = "";
-  setMessage(msg, files.length + " " + (mediaType === "video" ? "video" : "photo") + (files.length === 1 ? "" : "s") + " uploaded successfully.", "success");
+  setMessage(msg, uploaded + " " + (mediaType === "video" ? "videos" : "photos") + " uploaded successfully.", "success");
   await loadGalleryAdminList();
   await loadPublicGallery();
 }
