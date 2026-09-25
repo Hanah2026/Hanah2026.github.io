@@ -1539,13 +1539,36 @@ async function printStudentProfileCard() {
 
 function printStudentRecord() {
   const panel = $("studentRecordPanel");
+  const student = window.currentRecordData;
   if (!panel) return;
   const printWindow = window.open("", "_blank", "width=1000,height=800");
   if (!printWindow) { setMessage($("recordMessage"), "Please allow pop-ups to print the record.", "error"); return; }
-  printWindow.document.write(`<!doctype html><html><head><title>Student Master Record</title><style>body{font-family:Arial,sans-serif;padding:30px;color:#111}h1,h2,h3{margin-bottom:8px}.admin-table{width:100%;border-collapse:collapse;margin:12px 0 25px}.admin-table th,.admin-table td{border:1px solid #999;padding:7px;text-align:left}.admin-form-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}.welcome-card{padding:10px;margin:10px 0;border:1px solid #ccc}.admin-head{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #111;margin-bottom:20px}.btn,.admin-actions,#recordEditForm,#paymentForm,#recordMessage{display:none}</style></head><body>${panel.innerHTML}</body></html>`);
+
+  const name = student ? [student.first_name, student.middle_name, student.last_name].filter(Boolean).join(" ") : "Student Master Record";
+  const photoUrl = student?.photo_url || "";
+  const photo = photoUrl
+    ? `<img class="record-student-photo" src="${escapeHtml(photoUrl)}" alt="Student photo">`
+    : `<div class="record-student-photo placeholder">STUDENT<br>PHOTO</div>`;
+
+  printWindow.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(name)} - Student Master Record</title><style>
+  body{font-family:Arial,sans-serif;padding:30px;color:#111}
+  h1,h2,h3{margin-bottom:8px}
+  .record-top{display:flex;align-items:center;gap:20px;border-bottom:2px solid #111;padding-bottom:18px;margin-bottom:20px}
+  .record-student-photo{width:110px;height:135px;object-fit:cover;border:2px solid #111;border-radius:8px;display:block;flex:none}
+  .placeholder{display:flex;align-items:center;justify-content:center;text-align:center;color:#777;font-weight:bold;font-size:12px;border:2px dashed #888}
+  .record-name{font-size:24px;font-weight:800;margin:0 0 5px}
+  .record-id{font-size:14px;font-weight:700}
+  .admin-table{width:100%;border-collapse:collapse;margin:12px 0 25px}.admin-table th,.admin-table td{border:1px solid #999;padding:7px;text-align:left}
+  .admin-form-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}.welcome-card{padding:10px;margin:10px 0;border:1px solid #ccc}
+  .admin-head{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #111;margin-bottom:20px}
+  .btn,.admin-actions,#recordEditForm,#paymentForm,#recordMessage{display:none}
+  @media print{@page{size:A4;margin:12mm}body{padding:0}}
+  </style></head><body>
+  <div class="record-top">${photo}<div><p class="record-name">${escapeHtml(name)}</p><div class="record-id">STUDENT ID: ${escapeHtml(student?.student_id || "—")}</div><div>${escapeHtml(student?.current_belt || "White Belt")} • ${escapeHtml(student?.status || "Pending")}</div></div></div>
+  ${panel.innerHTML}
+  </body></html>`);
   printWindow.document.close(); printWindow.focus(); setTimeout(() => printWindow.print(), 300);
 }
-
 
 function ensurePromotionPanel() {
   let panel = $("promotionPanel");
