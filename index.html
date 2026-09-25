@@ -204,11 +204,6 @@
     if (isAdmin && typeof window.loadGalleryAdminList === "function") {
       await window.loadGalleryAdminList();
     }
-    if (isAdmin && !document.getElementById("uploadGalleryMedia")?.dataset.bound &&
-        typeof window.uploadGalleryMedia === "function") {
-      document.getElementById("uploadGalleryMedia").addEventListener("click", window.uploadGalleryMedia);
-      document.getElementById("uploadGalleryMedia").dataset.bound = "true";
-    }
   }
   galleryClient.auth.getSession().then(({ data }) => updateGalleryAdminVisibility(data.session));
   galleryClient.auth.onAuthStateChange((_event, session) => {
