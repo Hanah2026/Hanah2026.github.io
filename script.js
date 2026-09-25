@@ -179,33 +179,18 @@ async function loadPublicGallery() {
 
 async function ensureGalleryAdminPanel() {
   const panel = $("galleryAdminPanel");
-  if (panel) return panel;
-  const section = $("student-login");
-  const container = section?.querySelector(".container");
-  if (!container) return null;
+  if (!panel) return null;
 
-  const wrap = document.createElement("div");
-  wrap.id = "galleryAdminPanel";
-  wrap.className = "welcome-card";
-  wrap.style.marginTop = "20px";
-  wrap.innerHTML = `
-    <p class="eyebrow">GALLERY MANAGEMENT</p>
-    <h3>📷 Upload Gallery Highlight</h3>
-    <div class="admin-form-grid">
-      <label>Title<input id="galleryTitle" placeholder="Event or activity title"></label>
-      <label>Media Type<select id="galleryMediaType"><option value="image">Photo</option><option value="video">Video</option></select></label>
-      <label style="grid-column:1/-1;">Description<input id="galleryDescription" placeholder="Optional description"></label>
-      <label style="grid-column:1/-1;">Choose Photo / Video<input id="galleryFile" type="file" multiple accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime"></label>
-    </div>
-    <div class="admin-actions"><button id="uploadGalleryMedia" class="btn primary" type="button">UPLOAD TO GALLERY</button></div>
-    <p id="galleryAdminMessage" class="form-message"></p>
-    <div id="galleryAdminList" style="margin-top:15px;"></div>
-  `;
-  container.appendChild(wrap);
+  panel.style.display = "block";
 
-  $("uploadGalleryMedia").addEventListener("click", uploadGalleryMedia);
+  const uploadButton = $("uploadGalleryMedia");
+  if (uploadButton && !uploadButton.dataset.bound) {
+    uploadButton.addEventListener("click", uploadGalleryMedia);
+    uploadButton.dataset.bound = "true";
+  }
+
   await loadGalleryAdminList();
-  return wrap;
+  return panel;
 }
 
 async function loadGalleryAdminList() {
@@ -1645,6 +1630,7 @@ async function showAdminPortal(user) {
   await loadAttendanceStudents();
   await loadAdminAttendance();
   await loadPromotionAdmin();
+  await ensureGalleryAdminPanel();
 }
 
 async function showPortalForUser(user) {
