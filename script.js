@@ -206,7 +206,14 @@ async function loadGalleryAdminList() {
 
 async function uploadGalleryMedia() {
   const input = $("galleryFile");
-  const files = Array.from(input?.files || []);
+  const selectedFiles = Array.from(input?.files || []);
+  const seenFiles = new Set();
+  const files = selectedFiles.filter(file => {
+    const key = [file.name, file.size, file.lastModified, file.type].join("|");
+    if (seenFiles.has(key)) return false;
+    seenFiles.add(key);
+    return true;
+  });
   const title = $("galleryTitle")?.value.trim();
   const description = $("galleryDescription")?.value.trim() || null;
   const mediaType = $("galleryMediaType")?.value;
@@ -215,6 +222,9 @@ async function uploadGalleryMedia() {
   if (!files.length || !title) {
     setMessage(msg, "Enter a title and choose one or more files.", "error");
     return;
+  }
+  if (files.length < selectedFiles.length) {
+    setMessage(msg, "Duplicate selected files were removed. Uploading unique files only…");
   }
 
   for (const file of files) {
