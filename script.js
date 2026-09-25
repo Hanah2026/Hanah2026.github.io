@@ -219,13 +219,13 @@ async function uploadGalleryMedia() {
 
   for (const file of files) {
     const ok = mediaType === "image" ? file.type.startsWith("image/") : file.type.startsWith("video/");
-    const limit = mediaType === "image" ? 15 * 1024 * 1024 : 50 * 1024 * 1024;
+    const limit = mediaType === "image" ? 50 * 1024 * 1024 : 100 * 1024 * 1024;
     if (!ok) {
       setMessage(msg, "Please select only " + (mediaType === "image" ? "photos." : "videos."), "error");
       return;
     }
     if (file.size > limit) {
-      setMessage(msg, file.name + " is too large. Maximum is " + (mediaType === "image" ? "15 MB" : "50 MB") + ".", "error");
+      setMessage(msg, file.name + " is too large. Maximum is " + (mediaType === "image" ? "50 MB" : "100 MB") + ".", "error");
       return;
     }
   }
