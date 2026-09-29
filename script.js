@@ -375,6 +375,28 @@ async function showStudentPortal(user) {
   }
 
   const name = [profile.first_name, profile.middle_name, profile.last_name].filter(Boolean).join(" ") || user.email;
+  // Automatically record attendance when an active student logs in on a scheduled training day.
+  // The database function prevents duplicate attendance for the same student and date.
+  try {
+    const now = new Date();
+    const trainingDays = [1, 3, 5, 6]; // Monday, Wednesday, Friday, Saturday
+    if (String(profile.status || "").toLowerCase() === "active" && trainingDays.includes(now.getDay())) {
+      const localDate = [
+        now.getFullYear(),
+        String(now.getMonth() + 1).padStart(2, "0"),
+        String(now.getDate()).padStart(2, "0")
+      ].join("-");
+      const { error: attendanceError } = await db.rpc("mark_student_present", {
+        p_attendance_date: localDate
+      });
+      if (attendanceError) {
+        console.warn("Automatic attendance could not be recorded:", attendanceError.message);
+      }
+    }
+  } catch (attendanceError) {
+    console.warn("Automatic attendance error:", attendanceError?.message || attendanceError);
+  }
+
   const { data: latestPromotion } = await db.from("promotions")
     .select("new_belt,promotion_date")
     .eq("student_id", user.id)
