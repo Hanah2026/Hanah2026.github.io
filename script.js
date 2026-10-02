@@ -1159,8 +1159,16 @@ function ensureStudentRecordPanel() {
     <h3>💳 Add Payment</h3>
     <div class="admin-form-grid">
       <label>Date<input id="paymentDate" type="date"></label>
-      <label>Amount<input id="paymentAmount" type="number" min="0" step="0.01"></label>
-      <label>Type<input id="paymentType" placeholder="Membership / Tuition / Exam"></label>
+      <label>Amount<input id="paymentAmount" type="number" min="0" step="0.01" placeholder="0.00"></label>
+      <label>Type<select id="paymentType">
+        <option value="">Select payment type</option>
+        <option value="Training Fee">Training Fee</option>
+        <option value="Membership">Membership</option>
+        <option value="Examination Fee">Examination Fee</option>
+        <option value="Uniform">Uniform</option>
+        <option value="Competition Fee">Competition Fee</option>
+        <option value="Other">Other</option>
+      </select></label>
       <label>Reference<input id="paymentReference"></label>
       <label>Status<select id="paymentStatus"><option>Paid</option><option>Pending</option><option>Cancelled</option></select></label>
       <label>Remarks<input id="paymentRemarks"></label>
@@ -1195,7 +1203,14 @@ function ensureStudentRecordPanel() {
     if (status) status.textContent = `Selected: ${file.name} (${(file.size/1024/1024).toFixed(2)} MB). Click UPLOAD PHOTO.`;
   });
   $("uploadCertificate")?.addEventListener("click", () => uploadCertificate(window.currentRecordStudentId));
-  $("addPaymentRecord")?.addEventListener("click", () => { $("paymentForm").style.display = "block"; });
+  $("addPaymentRecord")?.addEventListener("click", () => {
+    $("paymentForm").style.display = "block";
+    const dateInput = $("paymentDate");
+    if (dateInput && !dateInput.value) dateInput.value = new Date().toISOString().slice(0, 10);
+    const typeInput = $("paymentType");
+    if (typeInput && !typeInput.value) typeInput.value = "Training Fee";
+    $("paymentAmount")?.focus();
+  });
   $("cancelPayment")?.addEventListener("click", () => { $("paymentForm").style.display = "none"; });
   $("savePayment")?.addEventListener("click", () => savePaymentRecord(window.currentRecordStudentId));
   return panel;
@@ -1420,8 +1435,13 @@ async function deleteAttendanceRecord(recordId, studentId) {
 async function savePaymentRecord(studentId) {
   if (!studentId) return;
   const msg = $("recordMessage");
-  const date = $("paymentDate").value, amount = $("paymentAmount").value, type = $("paymentType").value.trim();
-  if (!date || !amount || !type) { setMessage(msg, "Payment date, amount, and type are required.", "error"); return; }
+  const date = $("paymentDate")?.value || "";
+  const amount = $("paymentAmount")?.value || "";
+  const type = $("paymentType")?.value?.trim() || "";
+  if (!date || !amount || Number(amount) <= 0 || !type) {
+    setMessage(msg, "Please enter the payment date, amount, and payment type.", "error");
+    return;
+  }
   const { error } = await db.from("payments").insert({
     student_id: studentId, payment_date: date, amount: Number(amount), payment_type: type,
     reference_number: $("paymentReference").value.trim() || null, status: $("paymentStatus").value,
