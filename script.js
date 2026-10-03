@@ -1473,21 +1473,12 @@ async function uploadStudentPhoto(studentId) {
     const photoStatus = $("studentPhotoStatus");
     if (photoStatus) photoStatus.textContent = "Uploading photo to Supabase Storage…";
 
-    // Upload as a normal INSERT instead of upsert. This avoids requiring
-    // UPDATE permission when replacing an existing student photo.
-    const { error: removeError } = await db.storage
-      .from("student-photos")
-      .remove([path]);
-
-    // A missing old file is fine; continue with the new upload.
-    if (removeError) {
-      console.warn("Existing student photo could not be removed:", removeError.message);
-    }
-
+    // Replace an existing photo at the same path. The storage UPDATE policy
+    // allows authenticated users to replace the file without a separate delete.
     const { error: uploadError } = await db.storage
       .from("student-photos")
       .upload(path, file, {
-        upsert: false,
+        upsert: true,
         contentType: file.type,
         cacheControl: "3600"
       });
