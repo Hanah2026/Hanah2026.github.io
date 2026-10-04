@@ -193,8 +193,9 @@ async function loadGalleryAdminList() {
     .order("created_at", { ascending: false });
   if (error) { box.innerHTML = `<p class="form-message error">${escapeHtml(error.message)}</p>`; return; }
   box.innerHTML = (data || []).map(item => `
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;border-top:1px solid #ddd;padding:10px 0;">
-      <span><strong>${escapeHtml(item.title)}</strong> — ${item.media_type === "video" ? "Video" : "Photo"}</span>
+    <div style="display:flex;align-items:center;gap:12px;border-top:1px solid #ddd;padding:10px 0;">
+      <input type="checkbox" class="gallery-select-checkbox" data-id="${escapeHtml(item.id)}" aria-label="Select ${escapeHtml(item.title)}" style="width:18px;height:18px;">
+      <span style="flex:1;"><strong>${escapeHtml(item.title)}</strong> — ${item.media_type === "video" ? "Video" : "Photo"}</span>
       <button class="danger-btn gallery-delete-btn" data-id="${escapeHtml(item.id)}" type="button">DELETE</button>
     </div>`).join("") || "<p>No gallery uploads yet.</p>";
   box.onclick = async e => {
@@ -202,6 +203,18 @@ async function loadGalleryAdminList() {
     if (!b) return;
     await deleteGalleryItem(b.dataset.id);
   };
+  const selectAll = $("gallerySelectAll");
+  if (selectAll) {
+    selectAll.checked = false;
+    selectAll.onchange = () => {
+      box.querySelectorAll(".gallery-select-checkbox").forEach(cb => cb.checked = selectAll.checked);
+      updateGallerySelectionCount();
+    };
+  }
+  box.onchange = e => {
+    if (e.target.classList.contains("gallery-select-checkbox")) updateGallerySelectionCount();
+  };
+  updateGallerySelectionCount();
 }
 
 async function uploadGalleryMedia() {
@@ -267,6 +280,62 @@ async function uploadGalleryMedia() {
 
   input.value = "";
   setMessage(msg, uploaded + " " + (mediaType === "video" ? "videos" : "photos") + " uploaded successfully.", "success");
+  await loadGalleryAdminList();
+  await loadPublicGallery();
+}
+
+function getSelectedGalleryIds() {
+  return Array.from(document.querySelectorAll(".gallery-select-checkbox:checked"))
+    .map(cb => cb.dataset.id)
+    .filter(Boolean);
+}
+
+function updateGallerySelectionCount() {
+  const count = getSelectedGalleryIds().length;
+  const label = $("gallerySelectionCount");
+  if (label) label.textContent = count ? `${count} selected` : "0 selected";
+  const btn = $("deleteSelectedGallery");
+  if (btn) btn.disabled = count === 0;
+}
+
+async function deleteSelectedGalleryItems() {
+  const ids = getSelectedGalleryIds();
+  if (!ids.length) {
+    setMessage($("galleryAdminMessage"), "Select at least one photo or video.", "error");
+    return;
+  }
+  if (!confirm(`Delete ${ids.length} selected gallery item${ids.length === 1 ? "" : "s"}? This cannot be undone.`)) return;
+
+  const msg = $("galleryAdminMessage");
+  setMessage(msg, "Deleting selected gallery items…");
+  let deleted = 0;
+
+  for (const id of ids) {
+    const { data, error } = await db.from("gallery_highlights")
+      .select("file_path")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (error || !data) {
+      console.warn("Gallery record not found:", id, error?.message);
+      continue;
+    }
+
+    const { error: storageError } = await db.storage.from("gallery-media").remove([data.file_path]);
+    if (storageError) {
+      console.warn("Gallery file delete failed:", storageError.message);
+      continue;
+    }
+
+    const { error: deleteError } = await db.from("gallery_highlights").delete().eq("id", id);
+    if (deleteError) {
+      console.warn("Gallery record delete failed:", deleteError.message);
+      continue;
+    }
+    deleted++;
+  }
+
+  setMessage(msg, `${deleted} gallery item${deleted === 1 ? "" : "s"} deleted successfully.`, "success");
   await loadGalleryAdminList();
   await loadPublicGallery();
 }
@@ -1709,6 +1778,17 @@ async function showPortalForUser(user) {
 
 // Gallery upload button - delegated handler so it keeps working after dynamic rendering.
 document.addEventListener("click", async (event) => {
+  const deleteSelected = event.target.closest("#deleteSelectedGallery");
+  if (deleteSelected && deleteSelected.dataset.busy !== "true") {
+    deleteSelected.dataset.busy = "true";
+    try {
+      await deleteSelectedGalleryItems();
+    } finally {
+      deleteSelected.dataset.busy = "false";
+    }
+    return;
+  }
+
   const button = event.target.closest("#uploadGalleryMedia");
   if (!button || button.dataset.busy === "true") return;
   button.dataset.busy = "true";
