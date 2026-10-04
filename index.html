@@ -141,6 +141,11 @@
         <label style="grid-column:1/-1;">Choose Photo / Video<input id="galleryFile" type="file" multiple accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime"></label>
       </div>
       <div class="admin-actions"><button id="uploadGalleryMedia" class="btn primary" type="button">UPLOAD TO GALLERY</button></div>
+      <div class="admin-actions" style="margin-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <label style="display:flex;align-items:center;gap:6px;"><input id="gallerySelectAll" type="checkbox"> SELECT ALL</label>
+        <button id="deleteSelectedGallery" class="danger-btn" type="button" disabled>DELETE SELECTED</button>
+        <span id="gallerySelectionCount" style="font-size:14px;">0 selected</span>
+      </div>
       <p id="galleryAdminMessage" class="form-message"></p>
       <div id="galleryAdminList" style="margin-top:15px;"></div>
     </div>
