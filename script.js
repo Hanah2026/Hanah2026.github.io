@@ -120,6 +120,83 @@ if (loginForm) {
   });
 }
 
+// Student account recovery: password reset email and forgotten-email guidance.
+const recoverPasswordBtn = $("recoverPasswordBtn");
+if (recoverPasswordBtn) {
+  recoverPasswordBtn.addEventListener("click", async () => {
+    const email = $("email")?.value.trim().toLowerCase();
+    const msg = $("loginMessage");
+    if (!email) {
+      setMessage(msg, "Enter your registered email address in the Email address field first, then click FORGOT PASSWORD.", "error");
+      $("email")?.focus();
+      return;
+    }
+    setMessage(msg, "Sending password reset email…");
+    try {
+      const redirectTo = window.location.origin + window.location.pathname;
+      const { error } = await db.auth.resetPasswordForEmail(email, { redirectTo });
+      if (error) {
+        setMessage(msg, "Could not send reset email: " + error.message, "error");
+        return;
+      }
+      setMessage(msg, "If this email is registered, Supabase will send a password-reset link. Check your inbox and spam folder.", "success");
+    } catch (err) {
+      setMessage(msg, "Password reset could not be requested: " + (err?.message || String(err)), "error");
+    }
+  });
+}
+
+const recoverEmailBtn = $("recoverEmailBtn");
+if (recoverEmailBtn) {
+  recoverEmailBtn.addEventListener("click", () => {
+    const help = $("accountRecoveryHelp");
+    if (!help) return;
+    help.style.display = "block";
+    help.innerHTML = "<strong>Forgot your email address?</strong><br>For your privacy, the website cannot reveal an account email based only on a name or Student ID. Please contact the academy administrator and provide your full name, Student ID (if known), and the phone number registered with the academy. The administrator must verify your identity before helping you recover the account. Never share your password or verification code.";
+    setMessage($("loginMessage"), "", "");
+  });
+}
+
+// After opening a valid reset link, let the student set a new password.
+db.auth.onAuthStateChange(async (event) => {
+  if (event === "PASSWORD_RECOVERY") {
+    const form = $("loginForm");
+    if (!form || $("newRecoveryPassword")) return;
+    const recoveryForm = document.createElement("div");
+    recoveryForm.id = "passwordRecoveryForm";
+    recoveryForm.style.marginTop = "16px";
+    recoveryForm.innerHTML = `
+      <h3>SET A NEW PASSWORD</h3>
+      <label>New password<input id="newRecoveryPassword" type="password" minlength="6" autocomplete="new-password" required></label>
+      <label>Confirm new password<input id="confirmRecoveryPassword" type="password" minlength="6" autocomplete="new-password" required></label>
+      <button class="btn primary" id="saveRecoveryPassword" type="button">SAVE NEW PASSWORD</button>
+      <p id="recoveryPasswordMessage" class="form-message"></p>`;
+    form.insertAdjacentElement("afterend", recoveryForm);
+    $("saveRecoveryPassword").addEventListener("click", async () => {
+      const password = $("newRecoveryPassword").value;
+      const confirmPassword = $("confirmRecoveryPassword").value;
+      const msg = $("recoveryPasswordMessage");
+      if (password.length < 6) {
+        setMessage(msg, "Password must be at least 6 characters.", "error");
+        return;
+      }
+      if (password !== confirmPassword) {
+        setMessage(msg, "The passwords do not match.", "error");
+        return;
+      }
+      setMessage(msg, "Saving new password…");
+      const { error } = await db.auth.updateUser({ password });
+      if (error) {
+        setMessage(msg, "Could not update password: " + error.message, "error");
+        return;
+      }
+      setMessage(msg, "Password updated. You can now sign in with your new password.", "success");
+      recoveryForm.remove();
+      await db.auth.signOut();
+    });
+  }
+});
+
 function ensurePortalMessageArea() {
   let area = $("portalAccountArea");
   if (area) return area;
