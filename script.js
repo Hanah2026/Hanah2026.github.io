@@ -586,6 +586,8 @@ async function showStudentPortal(user) {
         <div><strong>Full Name</strong><br>${escapeHtml(name)}</div>
         <div><strong>Birth Date</strong><br>${formatDate(profile.birth_date)}</div>
         <div><strong>Gender</strong><br>${escapeHtml(profile.gender || "—")}</div>
+        <div><strong>Height</strong><br>${profile.height_cm != null ? escapeHtml(profile.height_cm + " cm") : "—"}</div>
+        <div><strong>Weight</strong><br>${profile.weight_kg != null ? escapeHtml(profile.weight_kg + " kg") : "—"}</div>
         <div><strong>Phone</strong><br>${escapeHtml(profile.phone || "—")}</div>
         <div><strong>Address</strong><br>${escapeHtml(profile.address || "—")}</div>
         <div><strong>Emergency Contact</strong><br>${escapeHtml(profile.emergency_contact_name || "—")}</div>
@@ -615,6 +617,8 @@ async function showStudentPortal(user) {
           <label>Last Name<input id="editLastName" type="text" autocomplete="family-name"></label>
           <label>Birth Date<input id="editBirthDate" type="date"></label>
           <label>Gender<select id="editGender"><option value="">— Select —</option><option value="Male">Male</option><option value="Female">Female</option><option value="Other">Other</option></select></label>
+          <label>Height (cm)<input id="editHeightCm" type="number" min="30" max="250" step="0.1" inputmode="decimal" placeholder="e.g. 145"></label>
+          <label>Weight (kg)<input id="editWeightKg" type="number" min="2" max="400" step="0.1" inputmode="decimal" placeholder="e.g. 42"></label>
           <label>Phone<input id="editPhone" type="tel" autocomplete="tel"></label>
           <label style="grid-column:1/-1;">Complete Address<textarea id="editAddress" rows="3" autocomplete="street-address" placeholder="House/Unit, Street, Barangay, City/Municipality, Province"></textarea></label>
           <label>Emergency Contact Name<input id="editEmergencyName" type="text" autocomplete="name"></label>
@@ -734,6 +738,8 @@ function openStudentProfileEditor(profile) {
   $("editLastName").value = profile.last_name || "";
   $("editBirthDate").value = profile.birth_date || "";
   $("editGender").value = profile.gender || "";
+  $("editHeightCm").value = profile.height_cm ?? "";
+  $("editWeightKg").value = profile.weight_kg ?? "";
   $("editPhone").value = profile.phone || "";
   $("editAddress").value = profile.address || "";
   $("editEmergencyName").value = profile.emergency_contact_name || "";
@@ -759,6 +765,19 @@ async function saveStudentProfile(userId) {
     return;
   }
 
+  const heightRaw = $("editHeightCm")?.value.trim() || "";
+  const weightRaw = $("editWeightKg")?.value.trim() || "";
+  const heightCm = heightRaw === "" ? null : Number(heightRaw);
+  const weightKg = weightRaw === "" ? null : Number(weightRaw);
+  if (heightCm !== null && (!Number.isFinite(heightCm) || heightCm < 30 || heightCm > 250)) {
+    setMessage(msg, "Enter a valid height between 30 and 250 cm.", "error");
+    return;
+  }
+  if (weightKg !== null && (!Number.isFinite(weightKg) || weightKg < 2 || weightKg > 400)) {
+    setMessage(msg, "Enter a valid weight between 2 and 400 kg.", "error");
+    return;
+  }
+
   setMessage(msg, "Saving your profile…");
   const updates = {
     first_name: firstName,
@@ -766,6 +785,8 @@ async function saveStudentProfile(userId) {
     last_name: lastName,
     birth_date: $("editBirthDate")?.value || null,
     gender: $("editGender")?.value || null,
+    height_cm: heightCm,
+    weight_kg: weightKg,
     phone: $("editPhone")?.value.trim() || null,
     address: $("editAddress")?.value.trim() || null,
     emergency_contact_name: $("editEmergencyName")?.value.trim() || null,
@@ -789,7 +810,7 @@ async function saveStudentProfile(userId) {
     .from("students")
     .update(updates)
     .eq("id", userId)
-    .select("id, student_id, first_name, middle_name, last_name, birth_date, gender, phone, address, emergency_contact_name, emergency_contact_phone, current_belt, status, date_joined, created_at, photo_path")
+    .select("id, student_id, first_name, middle_name, last_name, birth_date, gender, height_cm, weight_kg, phone, address, emergency_contact_name, emergency_contact_phone, current_belt, status, date_joined, created_at, photo_path")
     .maybeSingle();
 
   if (error) {
