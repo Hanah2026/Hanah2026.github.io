@@ -806,19 +806,13 @@ async function saveStudentProfile(userId) {
     }
   }
 
-  const { data, error } = await db
+  const { error } = await db
     .from("students")
     .update(updates)
-    .eq("id", userId)
-    .select("id, student_id, first_name, middle_name, last_name, birth_date, gender, height_cm, weight_kg, phone, address, emergency_contact_name, emergency_contact_phone, current_belt, status, date_joined, created_at, photo_path")
-    .maybeSingle();
+    .eq("id", userId);
 
   if (error) {
     setMessage(msg, "Profile update failed: " + error.message, "error");
-    return;
-  }
-  if (!data) {
-    setMessage(msg, "Profile was not updated. Please contact the academy administrator.", "error");
     return;
   }
 
