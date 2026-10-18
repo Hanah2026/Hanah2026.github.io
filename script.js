@@ -1260,6 +1260,8 @@ function ensureStudentRecordPanel() {
         <label>Last Name<input id="editLastName"></label>
         <label>Birth Date<input id="editBirthDate" type="date"></label>
         <label>Gender<select id="editGender"><option value="">Select</option><option>Male</option><option>Female</option></select></label>
+        <label>Height (cm)<input id="editHeightCmAdmin" type="number" min="30" max="250" step="0.1" placeholder="e.g. 145"></label>
+        <label>Weight (kg)<input id="editWeightKgAdmin" type="number" min="2" max="400" step="0.1" placeholder="e.g. 42"></label>
         <label>Phone<input id="editPhone"></label>
         <label>Address<input id="editAddress"></label>
         <label>Emergency Contact<input id="editEmergencyName"></label>
@@ -1391,7 +1393,7 @@ async function showStudentRecord(studentId) {
   setMessage(message, "");
 
   const { data: student, error: studentError } = await db.from("students")
-    .select("id, student_id, first_name, middle_name, last_name, birth_date, gender, phone, address, emergency_contact_name, emergency_contact_phone, current_belt, status, date_joined, created_at, photo_path")
+    .select("id, student_id, first_name, middle_name, last_name, birth_date, gender, height_cm, weight_kg, phone, address, emergency_contact_name, emergency_contact_phone, current_belt, status, date_joined, created_at, photo_path")
     .eq("id", studentId).maybeSingle();
   if (studentError || !student) {
     const err = studentError?.message || "Student record not found.";
@@ -1433,6 +1435,8 @@ async function showStudentRecord(studentId) {
   $("editLastName").value = student.last_name || "";
   $("editBirthDate").value = student.birth_date || "";
   $("editGender").value = student.gender || "";
+  $("editHeightCmAdmin").value = student.height_cm ?? "";
+  $("editWeightKgAdmin").value = student.weight_kg ?? "";
   $("editPhone").value = student.phone || "";
   $("editAddress").value = student.address || "";
   $("editEmergencyName").value = student.emergency_contact_name || "";
@@ -1453,6 +1457,8 @@ async function showStudentRecord(studentId) {
       <div><strong>Date Joined</strong><br>${formatDate(student.date_joined || student.created_at)}</div>
       <div><strong>Birth Date</strong><br>${formatDate(student.birth_date)}</div>
       <div><strong>Gender</strong><br>${escapeHtml(student.gender || "—")}</div>
+      <div><strong>Height</strong><br>${student.height_cm != null ? escapeHtml(student.height_cm + " cm") : "—"}</div>
+      <div><strong>Weight</strong><br>${student.weight_kg != null ? escapeHtml(student.weight_kg + " kg") : "—"}</div>
       <div><strong>Phone</strong><br>${escapeHtml(student.phone || "—")}</div>
       <div><strong>Address</strong><br>${escapeHtml(student.address || "—")}</div>
       <div><strong>Emergency Contact</strong><br>${escapeHtml(student.emergency_contact_name || "—")}</div>
@@ -1560,7 +1566,10 @@ async function saveStudentEdit(studentId) {
   const payload = {
     first_name: $("editFirstName").value.trim(), middle_name: $("editMiddleName").value.trim() || null,
     last_name: $("editLastName").value.trim(), birth_date: $("editBirthDate").value || null,
-    gender: $("editGender").value || null, phone: $("editPhone").value.trim() || null,
+    gender: $("editGender").value || null,
+    height_cm: $("editHeightCmAdmin").value.trim() === "" ? null : Number($("editHeightCmAdmin").value),
+    weight_kg: $("editWeightKgAdmin").value.trim() === "" ? null : Number($("editWeightKgAdmin").value),
+    phone: $("editPhone").value.trim() || null,
     address: $("editAddress").value.trim() || null, emergency_contact_name: $("editEmergencyName").value.trim() || null,
     emergency_contact_phone: $("editEmergencyPhone").value.trim() || null,
     current_belt: $("editCurrentBelt").value,
