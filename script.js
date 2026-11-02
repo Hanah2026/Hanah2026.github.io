@@ -483,7 +483,7 @@ function ensureSignOutButton() {
 }
 
 async function loadStudentProfile(user) {
-  const columns = "id, student_id, first_name, middle_name, last_name, birth_date, gender, phone, address, emergency_contact_name, emergency_contact_phone, current_belt, status, date_joined, created_at, photo_path";
+  const columns = "id, student_id, first_name, middle_name, last_name, birth_date, gender, phone, address, emergency_contact_name, emergency_contact_phone, current_belt, status, date_joined, created_at, photo_path, training_days";
   let { data, error } = await db
     .from("students")
     .select(columns)
@@ -525,8 +525,10 @@ async function showStudentPortal(user) {
   // The database function prevents duplicate attendance for the same student and date.
   try {
     const now = new Date();
-    const trainingDays = [1, 3, 5, 6]; // Monday, Wednesday, Friday, Saturday
-    if (String(profile.status || "").toLowerCase() === "active" && trainingDays.includes(now.getDay())) {
+    const assignedDays = Array.isArray(profile.training_days) ? profile.training_days : ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    const weekdayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    const todayName = weekdayNames[now.getDay()];
+    if (String(profile.status || "").toLowerCase() === "active" && assignedDays.includes(todayName)) {
       const localDate = [
         now.getFullYear(),
         String(now.getMonth() + 1).padStart(2, "0"),
@@ -591,6 +593,7 @@ async function showStudentPortal(user) {
         <div><strong>Phone</strong><br>${escapeHtml(profile.phone || "—")}</div>
         <div><strong>Address</strong><br>${escapeHtml(profile.address || "—")}</div>
         <div><strong>Emergency Contact</strong><br>${escapeHtml(profile.emergency_contact_name || "—")}</div>
+        <div><strong>Training Days</strong><br>${escapeHtml((profile.training_days || ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"]).join(", "))}</div>
         <div><strong>Emergency Phone</strong><br>${escapeHtml(profile.emergency_contact_phone || "—")}</div>
       </div>
       <div class="admin-actions">
@@ -1285,6 +1288,7 @@ function ensureStudentRecordPanel() {
           <option>5th Dan</option>
         </select></label>
         <label>Status<select id="editStatus"><option>Active</option><option>Pending</option></select></label>
+        <fieldset style="grid-column:1/-1;border:1px solid #ddd;border-radius:10px;padding:12px;"><legend><strong>Training Days</strong></legend><div style="display:flex;gap:14px;flex-wrap:wrap;">${["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"].map(day => `<label style="display:flex;align-items:center;gap:5px;"><input class="training-day-option" type="checkbox" value="${day}"> ${day}</label>`).join("")}</div></fieldset>
       </div>
       <div class="admin-actions"><button id="saveStudentEdit" class="btn" type="button">SAVE CHANGES</button><button id="cancelStudentEdit" class="btn outline" type="button">CANCEL</button></div>
     </div>
@@ -1393,7 +1397,7 @@ async function showStudentRecord(studentId) {
   setMessage(message, "");
 
   const { data: student, error: studentError } = await db.from("students")
-    .select("id, student_id, first_name, middle_name, last_name, birth_date, gender, height_cm, weight_kg, phone, address, emergency_contact_name, emergency_contact_phone, current_belt, status, date_joined, created_at, photo_path")
+    .select("id, student_id, first_name, middle_name, last_name, birth_date, gender, height_cm, weight_kg, phone, address, emergency_contact_name, emergency_contact_phone, current_belt, status, date_joined, created_at, photo_path, training_days")
     .eq("id", studentId).maybeSingle();
   if (studentError || !student) {
     const err = studentError?.message || "Student record not found.";
@@ -1443,6 +1447,8 @@ async function showStudentRecord(studentId) {
   $("editEmergencyPhone").value = student.emergency_contact_phone || "";
   $("editCurrentBelt").value = student.current_belt || "White Belt";
   $("editStatus").value = student.status || "Active";
+  const assignedTrainingDays = student.training_days || ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+  document.querySelectorAll(".training-day-option").forEach(input => { input.checked = assignedTrainingDays.includes(input.value); });
   $("recordEditForm").style.display = "none";
   $("paymentForm").style.display = "none";
   if ($("certificateDate") && !$("certificateDate").value) $("certificateDate").value = new Date().toISOString().slice(0,10);
@@ -1454,6 +1460,7 @@ async function showStudentRecord(studentId) {
       <div><strong>Student ID</strong><br>${escapeHtml(repairedStudentId || "—")}</div>
       <div><strong>Current Belt</strong><br>${escapeHtml(effectiveBelt)}</div>
       <div><strong>Status</strong><br>${escapeHtml(student.status || "Pending")}</div>
+      <div><strong>Training Days</strong><br>${escapeHtml((student.training_days || ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"]).join(", "))}</div>
       <div><strong>Date Joined</strong><br>${formatDate(student.date_joined || student.created_at)}</div>
       <div><strong>Birth Date</strong><br>${formatDate(student.birth_date)}</div>
       <div><strong>Gender</strong><br>${escapeHtml(student.gender || "—")}</div>
@@ -1573,9 +1580,11 @@ async function saveStudentEdit(studentId) {
     address: $("editAddress").value.trim() || null, emergency_contact_name: $("editEmergencyName").value.trim() || null,
     emergency_contact_phone: $("editEmergencyPhone").value.trim() || null,
     current_belt: $("editCurrentBelt").value,
-    status: $("editStatus").value
+    status: $("editStatus").value,
+    training_days: Array.from(document.querySelectorAll(".training-day-option:checked")).map(input => input.value)
   };
   if (!payload.first_name || !payload.last_name) { setMessage(msg, "First name and last name are required.", "error"); return; }
+  if (!payload.training_days.length) { setMessage(msg, "Select at least one training day.", "error"); return; }
   const { error } = await db.from("students").update(payload).eq("id", studentId);
   if (error) { setMessage(msg, "Update failed: " + error.message, "error"); return; }
   setMessage(msg, "Student information updated successfully.", "success");
